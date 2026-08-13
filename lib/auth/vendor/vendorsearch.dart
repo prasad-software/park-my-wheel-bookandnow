@@ -74,53 +74,68 @@ class _vSearchScreenState extends State<vSearchScreen>
 
       if (!mounted) return;
 
-      if (amountVal <= 0) {
-        // ₹0 — exit immediately without showing the popup
-        setState(() => _isCheckingExit.remove(bookingId));
-        await _performQuickExit(vehicle, '0');
-      } else {
-        setState(() => _isCheckingExit.remove(bookingId));
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (context) {
-            return DraggableScrollableSheet(
-              expand: false,
-              builder: (context, scrollController) {
-                return Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
+      if (!mounted) return;
+      setState(() => _isCheckingExit.remove(bookingId));
+      
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) {
+          return DraggableScrollableSheet(
+            expand: false,
+            builder: (context, scrollController) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(20),
                   ),
-                  child: Exitpage(
-                    currentTabIndex: 0,
-                    userid: vehicle['userid'] ?? vehicle['userId'] ?? '',
-                    otp: vehicle['otp'] ?? '',
-                    vehicletype: vehicle['vehicleType'] ?? '',
-                    bookingid: bookingId,
-                    parkingdate:
-                        vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '',
-                    vehiclenumber: vehicle['vehicleNumber'] ?? '',
-                    username: vehicle['personName'] ?? '',
-                    phoneno: vehicle['mobileNumber'] ?? '',
-                    parkingtime:
-                        vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
-                    bookingtypetemporary: vehicle['status'] ?? '',
-                    sts: vehicle['sts'] ?? '',
-                    cartype: vehicle['carType'] ?? '',
-                    vendorid: vehicle['vendorId'] ?? widget.vendorid,
-                    bookType: vehicle['bookType'] ?? '',
-                    onExitSuccess: () => fetchVendors(),
-                  ),
-                );
-              },
-            );
-          },
-        );
-      }
+                ),
+                child: Exitpage(
+                  currentTabIndex: 0,
+                  userid: vehicle['userid'] ?? vehicle['userId'] ?? '',
+                  otp: vehicle['otp'] ?? '',
+                  vehicletype: vehicle['vehicleType'] ?? '',
+                  bookingid: bookingId,
+                  parkingdate:
+                      vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '',
+                  vehiclenumber: vehicle['vehicleNumber'] ?? '',
+                  username: vehicle['personName'] ?? '',
+                  phoneno: vehicle['mobileNumber'] ?? '',
+                  parkingtime:
+                      vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
+                  bookingtypetemporary: vehicle['status'] ?? '',
+                  sts: vehicle['sts'] ?? '',
+                  cartype: vehicle['carType'] ?? '',
+                  vendorid: vehicle['vendorId'] ?? widget.vendorid,
+                  bookType: vehicle['bookType'] ?? '',
+                  onExitSuccess: () {
+                    final now = DateTime.now();
+                    final formattedDate = DateFormat('dd-MM-yyyy').format(now);
+                    setState(() {
+                      for (var v in allVendors) {
+                        if ((v['_id']?.toString() ?? v['id']?.toString() ?? '') == bookingId) {
+                          v['status'] = 'COMPLETED';
+                          v['exitvehicledate'] = formattedDate;
+                          v['exitvehicletime'] = DateFormat('HH:mm').format(now);
+                          break;
+                        }
+                      }
+                      // Remove from current filtered list (since we are on 'On Parking' tab)
+                      filteredVendors.removeWhere(
+                        (v) => (v['_id']?.toString() ?? v['id']?.toString() ?? '') == bookingId,
+                      );
+                    });
+                  // Still fetch to ensure consistency, but UI is already updated
+                  fetchVendors(showLoading: false);
+                },
+              ), // closes Exitpage
+              ); // closes Container
+            }, // closes builder
+          ); // closes DraggableScrollableSheet
+        }, // closes builder
+      ); // closes showModalBottomSheet
     } catch (_) {
       if (mounted) setState(() => _isCheckingExit.remove(bookingId));
     }
@@ -243,12 +258,14 @@ class _vSearchScreenState extends State<vSearchScreen>
     }
   }
 
-  Future<void> fetchVendors() async {
+  Future<void> fetchVendors({bool showLoading = true}) async {
     try {
-      setState(() {
-        isLoading = true;
-        hasError = false;
-      });
+      if (showLoading) {
+        setState(() {
+          isLoading = true;
+          hasError = false;
+        });
+      }
 
       final response = await http
           .get(
@@ -450,8 +467,14 @@ class _vSearchScreenState extends State<vSearchScreen>
         currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(
           bookingId,
         ).timeout(_apiTimeout);
+        if (currentAmount.isEmpty ||
+            currentAmount == '0' ||
+            currentAmount == '0.0' ||
+            currentAmount == '0.00') {
+          currentAmount = vehicle['amount']?.toString() ?? '0';
+        }
       } on TimeoutException {
-        currentAmount = '0';
+        currentAmount = vehicle['amount']?.toString() ?? '0';
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -461,6 +484,8 @@ class _vSearchScreenState extends State<vSearchScreen>
             ),
           );
         }
+      } catch (_) {
+        currentAmount = vehicle['amount']?.toString() ?? '0';
       }
 
       if (!mounted) return;
@@ -485,6 +510,7 @@ class _vSearchScreenState extends State<vSearchScreen>
           sts: vehicle['sts'] ?? '',
           fastPrint: true,
           instantParkingReceipt: true,
+          isPrintAndExit: true,
         ).timeout(_printTimeout);
       } on TimeoutException {
         if (mounted) {
@@ -502,8 +528,40 @@ class _vSearchScreenState extends State<vSearchScreen>
           );
         }
       }
+      if (mounted) {
+        setState(() {
+          // Optimistically update to COMPLETED instead of removing entirely
+          final now = DateTime.now();
+          final formattedDate = DateFormat('dd-MM-yyyy').format(now);
+          
+          for (var v in allVendors) {
+            if ((v['_id']?.toString() ?? v['id']?.toString() ?? '') == bookingId) {
+              v['status'] = 'COMPLETED';
+              v['exitvehicledate'] = formattedDate;
+              // Add a rough exit time just in case it's needed for UI
+              v['exitvehicletime'] = DateFormat('HH:mm').format(now);
+              break;
+            }
+          }
+          
+          // Remove from current filtered list (since we are on 'On Parking' tab)
+          filteredVendors.removeWhere(
+            (v) =>
+                (v['_id']?.toString() ?? v['id']?.toString() ?? '') ==
+                bookingId,
+          );
+          _isExiting.remove(bookingId);
+        });
+      }
 
-      await _performQuickExit(vehicle, currentAmount, manageLoading: false);
+      // Fire and forget the exit API call
+      _performQuickExit(
+        vehicle,
+        currentAmount,
+        manageLoading: false,
+      ).catchError((e) {
+        print('Background Quick Exit failed for $bookingId: $e');
+      });
     } catch (e) {
       print('Print & Exit: Error: $e');
       if (mounted) {
@@ -512,7 +570,6 @@ class _vSearchScreenState extends State<vSearchScreen>
           context,
         ).showSnackBar(SnackBar(content: Text('Exit failed: $msg')));
       }
-    } finally {
       _setExiting(bookingId, false);
     }
   }
@@ -613,7 +670,6 @@ class _vSearchScreenState extends State<vSearchScreen>
               content: Text('Vehicle exited successfully (Cash)!'),
             ),
           );
-          fetchVendors();
         }
       } else {
         String errMsg = 'Failed to exit vehicle (${response.statusCode})';
@@ -1143,10 +1199,20 @@ class _vSearchScreenState extends State<vSearchScreen>
                                                     print(
                                                       'Print: Button pressed for vehicle: ${vehicle['vehicleNumber']} (ID: $bId)',
                                                     );
-                                                    String currentAmount =
-                                                        await UniversalPrintHelper.getPrintAmountFromAPI(
-                                                          bId,
-                                                        );
+                                                    String currentAmount;
+                                                    try {
+                                                      currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(
+                                                        bId,
+                                                      ).timeout(const Duration(seconds: 10));
+                                                      if (currentAmount.isEmpty ||
+                                                          currentAmount == '0' ||
+                                                          currentAmount == '0.0' ||
+                                                          currentAmount == '0.00') {
+                                                        currentAmount = vehicle['amount']?.toString() ?? '0';
+                                                      }
+                                                    } catch (_) {
+                                                      currentAmount = vehicle['amount']?.toString() ?? '0';
+                                                    }
 
                                                     await UniversalPrintHelper.printTicket(
                                                       context: context,
@@ -1346,9 +1412,7 @@ class _vSearchScreenState extends State<vSearchScreen>
                                                   child: ElevatedButton(
                                                     onPressed:
                                                         (_isCheckingExit[rowBookingId] ==
-                                                                    true ||
-                                                                _isExiting[rowBookingId] ==
-                                                                    true)
+                                                                true)
                                                             ? null
                                                             : () =>
                                                                 _handleExitButtonPressed(
@@ -1655,10 +1719,20 @@ class _vSearchScreenState extends State<vSearchScreen>
                                                     print(
                                                       'Sub Print: Button pressed for ${vehicle['vehicleNumber']} (ID: $bId)',
                                                     );
-                                                    String currentAmount =
-                                                        await UniversalPrintHelper.getPrintAmountFromAPI(
-                                                          bId,
-                                                        );
+                                                    String currentAmount;
+                                                    try {
+                                                      currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(
+                                                        bId,
+                                                      ).timeout(const Duration(seconds: 10));
+                                                      if (currentAmount.isEmpty ||
+                                                          currentAmount == '0' ||
+                                                          currentAmount == '0.0' ||
+                                                          currentAmount == '0.00') {
+                                                        currentAmount = vehicle['amount']?.toString() ?? '0';
+                                                      }
+                                                    } catch (_) {
+                                                      currentAmount = vehicle['amount']?.toString() ?? '0';
+                                                    }
                                                     await UniversalPrintHelper.printTicket(
                                                       context: context,
                                                       vendorName:

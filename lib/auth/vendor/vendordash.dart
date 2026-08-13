@@ -3309,7 +3309,10 @@ class UniversalPrintHelper {
   static bool _isBuiltinPrinterType(String type) =>
       type == 'sunmi' || type == 'sumi' || type == 'pinelabs_builtin';
 
-  static Future<bool> _bindAndInitSunmi({bool init = true, bool forceBind = false}) async {
+  static Future<bool> _bindAndInitSunmi({
+    bool init = true,
+    bool forceBind = false,
+  }) async {
     if (_sunmiBoundAndInited && !forceBind) return true;
     try {
       final bool? bound = await SunmiPrinterPlus().rebindPrinter().timeout(
@@ -3967,25 +3970,12 @@ class UniversalPrintHelper {
         await SunmiPrinter.lineWrap(1);
         await SunmiPrinter.printText('Full Day : Rs. $displayAmt');
       }
-    } else if (slabLines.isNotEmpty) {
-      await SunmiPrinter.lineWrap(1);
-      if (instantParkingReceipt) {
-        if (isPrintAndExit) {
-          final amt =
-              slabLines[0].contains(': Rs.')
-                  ? slabLines[0].split(': Rs.').last.trim()
-                  : slabLines[0];
-          await SunmiPrinter.printText('Parking Amount : Rs. $amt');
-        }
-      } else {
-        // await SunmiPrinter.printText(slabLines[0]);
-        // if (slabLines.length > 1) {
-        //   await SunmiPrinter.printText(slabLines[1]);
-        // }
-      }
     } else {
       if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-        await SunmiPrinter.printText('Parking Amount : Rs. $cleanedAmt');
+        if (!instantParkingReceipt || isPrintAndExit) {
+          await SunmiPrinter.lineWrap(1);
+          await SunmiPrinter.printText('Parking Amount : Rs. $cleanedAmt');
+        }
       }
     }
 
@@ -4206,18 +4196,6 @@ class UniversalPrintHelper {
         bytes += 'Full Day : Rs. $displayAmt'.codeUnits;
         bytes += [0x0A];
       }
-    } else if (slabLines.isNotEmpty) {
-      if (instantParkingReceipt) {
-        if (isPrintAndExit) {
-          bytes += 'Parking Amount : Rs. $cleanedEscAmt'.codeUnits;
-          bytes += [0x0A];
-        }
-      } else {
-        // for (final line in slabLines) {
-        //   bytes += line.codeUnits;
-        //   bytes += [0x0A];
-        // }
-      }
     } else {
       if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
         if (!instantParkingReceipt || isPrintAndExit) {
@@ -4229,7 +4207,7 @@ class UniversalPrintHelper {
 
     if (bookingId.isNotEmpty) {
       bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
-      
+
       // PineLabs firmware does not support native ESC/POS QR generation
       // Render the QR code to an image first
       final qrCode = QrCode(4, QrErrorCorrectLevel.M);
@@ -4246,7 +4224,14 @@ class UniversalPrintHelper {
       for (int x = 0; x < size; x++) {
         for (int y = 0; y < size; y++) {
           if (qrImage.isDark(y, x)) {
-            img.fillRect(image, x1: x * scale, y1: y * scale, x2: (x + 1) * scale - 1, y2: (y + 1) * scale - 1, color: img.ColorRgb8(0, 0, 0));
+            img.fillRect(
+              image,
+              x1: x * scale,
+              y1: y * scale,
+              x2: (x + 1) * scale - 1,
+              y2: (y + 1) * scale - 1,
+              color: img.ColorRgb8(0, 0, 0),
+            );
           }
         }
       }
@@ -5076,6 +5061,13 @@ class cardashleft extends StatelessWidget {
                                                 await UniversalPrintHelper.getPrintAmountFromAPI(
                                                   vehicle.id,
                                                 );
+                                            if (currentAmount.isEmpty ||
+                                                currentAmount == '0' ||
+                                                currentAmount == '0.0' ||
+                                                currentAmount == '0.00') {
+                                              currentAmount =
+                                                  vehicle.amount.toString();
+                                            }
 
                                             UniversalPrintHelper.printTicket(
                                               context: context,
@@ -5149,6 +5141,68 @@ class cardashleft extends StatelessWidget {
                                           ),
                                         ),
                                       ),
+                                      // Print & Exit Button
+                                      if (currentTabIndex == 0 &&
+                                          vehicle.sts == 'Instant')
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 8.0,
+                                          ),
+                                          child: ElevatedButton(
+                                            onPressed:
+                                                () =>
+                                                    DashQuickExitHelper.handlePrintAndExit(
+                                                      context: context,
+                                                      vehicle: vehicle,
+                                                      vendorId: vendorId,
+                                                      bookType: bookType,
+                                                      defaultVendorName:
+                                                          defaultVendorName,
+                                                    ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.white,
+                                              foregroundColor:
+                                                  ColorUtils.primarycolor(),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 5,
+                                                  ),
+                                              minimumSize: const Size(0, 0),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    const BorderRadius.all(
+                                                      Radius.circular(5),
+                                                    ),
+                                                side: BorderSide(
+                                                  color:
+                                                      ColorUtils.primarycolor(),
+                                                  width: 0.5,
+                                                ),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.print,
+                                                  color: Colors.black,
+                                                  size: 14,
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  'Print & Exit',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color:
+                                                        ColorUtils.primarycolor(),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       // Exit Button
                                       Padding(
                                         padding: const EdgeInsets.only(
@@ -5658,6 +5712,13 @@ class bikedashleft extends StatelessWidget {
                                                 await UniversalPrintHelper.getPrintAmountFromAPI(
                                                   vehicle.id,
                                                 );
+                                            if (currentAmount.isEmpty ||
+                                                currentAmount == '0' ||
+                                                currentAmount == '0.0' ||
+                                                currentAmount == '0.00') {
+                                              currentAmount =
+                                                  vehicle.amount.toString();
+                                            }
 
                                             UniversalPrintHelper.printTicket(
                                               context: context,
@@ -5731,6 +5792,68 @@ class bikedashleft extends StatelessWidget {
                                           ),
                                         ),
                                       ),
+                                      // Print & Exit Button
+                                      if (currentTabIndex == 0 &&
+                                          vehicle.sts == 'Instant')
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 8.0,
+                                          ),
+                                          child: ElevatedButton(
+                                            onPressed:
+                                                () =>
+                                                    DashQuickExitHelper.handlePrintAndExit(
+                                                      context: context,
+                                                      vehicle: vehicle,
+                                                      vendorId: vendorId,
+                                                      bookType: bookType,
+                                                      defaultVendorName:
+                                                          defaultVendorName,
+                                                    ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.white,
+                                              foregroundColor:
+                                                  ColorUtils.primarycolor(),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 5,
+                                                  ),
+                                              minimumSize: const Size(0, 0),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    const BorderRadius.all(
+                                                      Radius.circular(5),
+                                                    ),
+                                                side: BorderSide(
+                                                  color:
+                                                      ColorUtils.primarycolor(),
+                                                  width: 0.5,
+                                                ),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.print,
+                                                  color: Colors.black,
+                                                  size: 14,
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  'Print & Exit',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color:
+                                                        ColorUtils.primarycolor(),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       // Exit Button
                                       Padding(
                                         padding: const EdgeInsets.only(
@@ -6240,6 +6363,13 @@ class othersdashleft extends StatelessWidget {
                                                 await UniversalPrintHelper.getPrintAmountFromAPI(
                                                   vehicle.id,
                                                 );
+                                            if (currentAmount.isEmpty ||
+                                                currentAmount == '0' ||
+                                                currentAmount == '0.0' ||
+                                                currentAmount == '0.00') {
+                                              currentAmount =
+                                                  vehicle.amount.toString();
+                                            }
 
                                             UniversalPrintHelper.printTicket(
                                               context: context,
@@ -6313,6 +6443,68 @@ class othersdashleft extends StatelessWidget {
                                           ),
                                         ),
                                       ),
+                                      // Print & Exit Button
+                                      if (currentTabIndex == 0 &&
+                                          vehicle.sts == 'Instant')
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 8.0,
+                                          ),
+                                          child: ElevatedButton(
+                                            onPressed:
+                                                () =>
+                                                    DashQuickExitHelper.handlePrintAndExit(
+                                                      context: context,
+                                                      vehicle: vehicle,
+                                                      vendorId: vendorId,
+                                                      bookType: bookType,
+                                                      defaultVendorName:
+                                                          defaultVendorName,
+                                                    ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.white,
+                                              foregroundColor:
+                                                  ColorUtils.primarycolor(),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 5,
+                                                  ),
+                                              minimumSize: const Size(0, 0),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    const BorderRadius.all(
+                                                      Radius.circular(5),
+                                                    ),
+                                                side: BorderSide(
+                                                  color:
+                                                      ColorUtils.primarycolor(),
+                                                  width: 0.5,
+                                                ),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.print,
+                                                  color: Colors.black,
+                                                  size: 14,
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  'Print & Exit',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color:
+                                                        ColorUtils.primarycolor(),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       // Exit Button
                                       Padding(
                                         padding: const EdgeInsets.only(
@@ -7376,5 +7568,170 @@ class Exitcharge {
 
   Map<String, dynamic> toJson() {
     return {'amount': amount, 'type': type, 'fullDayCharge': fullDayCharge};
+  }
+}
+
+class DashQuickExitHelper {
+  static Future<void> handlePrintAndExit({
+    required BuildContext context,
+    required Bookingdata vehicle,
+    required String vendorId,
+    required String bookType,
+    String? defaultVendorName,
+  }) async {
+    final String bookingId = vehicle.id;
+    if (bookingId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Booking ID not found')),
+      );
+      return;
+    }
+
+    try {
+      String currentAmount;
+      try {
+        currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(
+          bookingId,
+        ).timeout(const Duration(seconds: 10));
+        if (currentAmount.isEmpty ||
+            currentAmount == '0' ||
+            currentAmount == '0.0' ||
+            currentAmount == '0.00') {
+          currentAmount = vehicle.amount.toString();
+        }
+      } catch (_) {
+        currentAmount = '0';
+      }
+
+      if (!context.mounted) return;
+      try {
+        await UniversalPrintHelper.printTicket(
+          context: context,
+          vendorName: defaultVendorName ?? vehicle.vendorname,
+          bookingId: bookingId,
+          invoiceId: vehicle.invoiceid,
+          vehicleType: vehicle.vehicletype,
+          vehicleNumber: vehicle.vehicleNumber,
+          parkingDate: vehicle.parkingDate,
+          parkingTime: vehicle.parkingTime,
+          amount: currentAmount,
+          personName: vehicle.username,
+          valetCharge: double.tryParse(vehicle.valetCharge) ?? 0.0,
+          mobileNumber: vehicle.mobilenumber,
+          vendorId: vendorId,
+          bookType: bookType,
+          sts: vehicle.sts,
+          fastPrint: true,
+          instantParkingReceipt: true,
+          isPrintAndExit: true,
+        ).timeout(const Duration(seconds: 10));
+      } catch (e) {
+        print('Print failed: $e');
+      }
+
+      await _performQuickExit(context, vehicle, currentAmount);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Exit failed: $e')));
+      }
+    }
+  }
+
+  static Future<void> _performQuickExit(
+    BuildContext context,
+    Bookingdata vehicle,
+    String amount,
+  ) async {
+    final String bookingId = vehicle.id;
+    final url = Uri.parse('${ApiConfig.baseUrl}vendor/exitvehicle/$bookingId');
+
+    final parkedDateTime =
+        UniversalPrintHelper.tryParseDateTime(
+          date: vehicle.parkingDate,
+          time: vehicle.parkingTime,
+        ) ??
+        DateTime.now();
+
+    var duration = DateTime.now().difference(parkedDateTime);
+    if (duration.isNegative) duration = Duration.zero;
+    final formattedDuration = _formatDuration(duration);
+    final parkingCharge = double.tryParse(amount.trim()) ?? 0.0;
+
+    final Map<String, dynamic> requestBody = {
+      'amount': parkingCharge,
+      'hour': formattedDuration,
+      'paymentMode': 'Cash',
+    };
+
+    final userId = vehicle.userid.trim();
+    if (userId.isNotEmpty) {
+      try {
+        final gstData = await _fetchGstFeeForExit();
+        final gstPercentage =
+            double.tryParse(gstData['gst']?.toString() ?? '0') ?? 0.0;
+        final handlingFeeAmount =
+            double.tryParse(gstData['handlingfee']?.toString() ?? '0') ?? 0.0;
+        final gstBase = parkingCharge + handlingFeeAmount;
+        final gstAmount = (gstBase * gstPercentage) / 100;
+        final exactTotal = parkingCharge + handlingFeeAmount + gstAmount;
+        final finalTotal = _roundUpToNearestRupeeForExit(exactTotal);
+        requestBody['gstamout'] = gstAmount;
+        requestBody['handlingfee'] = handlingFeeAmount;
+        requestBody['totalamout'] = finalTotal;
+      } catch (_) {}
+    }
+
+    final response = await http
+        .put(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(requestBody),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode == 200) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vehicle exited successfully (Cash)!')),
+        );
+
+      }
+    } else {
+      throw Exception('Failed to exit vehicle (${response.statusCode})');
+    }
+  }
+
+  static Future<Map<String, dynamic>> _fetchGstFeeForExit() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}gst-fee/all'),
+    );
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      if (jsonResponse['status'] == true &&
+          jsonResponse['data'] is List &&
+          jsonResponse['data'].isNotEmpty) {
+        return jsonResponse['data'][0];
+      }
+    }
+    return {'gst': 0.0, 'handlingfee': 0.0};
+  }
+
+  static double _roundUpToNearestRupeeForExit(double value) {
+    if (value <= 0) return 0.0;
+    int intPart = value.floor();
+    double decimalPart = value - intPart;
+    if (decimalPart > 0.001) {
+      return (intPart + 1).toDouble();
+    }
+    return intPart.toDouble();
+  }
+
+  static String _formatDuration(Duration duration) {
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
   }
 }

@@ -1228,7 +1228,11 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           );
           final bool instantReceipt =
               _selectedOption == 'Instant' &&
-              (vehicleType == 'Car' || vehicleType == 'Bike' || vehicleType == 'Others' || vehicleType == 'other' || vehicleType == 'Other') &&
+              (vehicleType == 'Car' ||
+                  vehicleType == 'Bike' ||
+                  vehicleType == 'Others' ||
+                  vehicleType == 'other' ||
+                  vehicleType == 'Other') &&
               _selectedPass == null &&
               isHourly;
 
@@ -2037,7 +2041,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     final bool isSubscription =
         (snap == 'weekly' || snap == '15day' || snap == 'monthly') ||
         (receiptSts == null && _selectedOption == 'Subscription');
-        
+
     double finalAmt = double.tryParse(amount.toString().trim()) ?? 0.0;
     if (isPrintAndExit && valetChargeAmount != null && valetChargeAmount > 0) {
       finalAmt += valetChargeAmount;
@@ -2047,7 +2051,10 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     if (isPass && passHoursForReceipt != null) {
       // Pass booking (12hr / 24hr / 48hr / 72hr)
       if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-        final label = passHoursForReceipt == 24 ? 'Full Day' : '$passHoursForReceipt Hour';
+        final label =
+            passHoursForReceipt == 24
+                ? 'Full Day'
+                : '$passHoursForReceipt Hour';
         await SunmiPrinter.printText('$label Pass');
         await SunmiPrinter.lineWrap(1);
         await SunmiPrinter.printText('Parking Amount : Rs. $cleanedAmt');
@@ -2077,23 +2084,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
       }
     } else {
       // Hourly, no pass
-      final slabLines = _getHourlyPricingSlabLinesForVehicle(vehicleType);
-      if (slabLines.isNotEmpty) {
-        if (instantParkingReceipt) {
-          if (isPrintAndExit) {
-            if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-              await SunmiPrinter.printText('Parking Amount : Rs. $cleanedAmt');
-              await SunmiPrinter.lineWrap(1);
-            }
-          }
-        } else {
-          // await SunmiPrinter.printText(slabLines[0]);
-          // if (slabLines.length > 1) {
-          //   await SunmiPrinter.printText(slabLines[1]);
-          // }
-        }
-      } else if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-        // Commenting out Amount as well for instant receipts if no slab lines
+      if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
         if (!instantParkingReceipt || isPrintAndExit) {
           await SunmiPrinter.printText('Parking Amount : Rs. $cleanedAmt');
           await SunmiPrinter.lineWrap(1);
@@ -2511,7 +2502,11 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           );
           final bool instantReceipt =
               _selectedOption == 'Instant' &&
-              (vehicleType == 'Car' || vehicleType == 'Bike' || vehicleType == 'Others' || vehicleType == 'other' || vehicleType == 'Other') &&
+              (vehicleType == 'Car' ||
+                  vehicleType == 'Bike' ||
+                  vehicleType == 'Others' ||
+                  vehicleType == 'other' ||
+                  vehicleType == 'Other') &&
               _selectedPass == null &&
               isHourly;
 
@@ -3207,7 +3202,6 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                         ],
                       ),
                       const SizedBox(height: 15),
-
 
                       if (_paymentMode == 'Online') _buildInlineUpiQr(),
                       const SizedBox(height: 10),
@@ -4015,17 +4009,20 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     return Expanded(
       child: ElevatedButton.icon(
         onPressed: (isDisabled || isLoading) ? null : onTap,
-        icon: isLoading
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Icon(icon, size: 16),
+        icon:
+            isLoading
+                ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                : Icon(icon, size: 16),
         label: Text(label, style: const TextStyle(fontSize: 11)),
         style: ElevatedButton.styleFrom(
-          backgroundColor: (isDisabled || isLoading) ? Colors.grey.shade300 : color,
-          foregroundColor: (isDisabled || isLoading) ? Colors.grey.shade500 : Colors.white,
+          backgroundColor:
+              (isDisabled || isLoading) ? Colors.grey.shade300 : color,
+          foregroundColor:
+              (isDisabled || isLoading) ? Colors.grey.shade500 : Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: (isDisabled || isLoading) ? 0 : 2,
