@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>438168052516-fa1b7m1bur91nnap3qco5smethr4i421.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyDZQlIZK2fS6rhMMisYcPXwzsHmTPCOlc4</string>
+	<key>GCM_SENDER_ID</key>
+	<string>438168052516</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.park.mywheel</string>
+	<key>PROJECT_ID</key>
+	<string>parkmywheels-1f3da</string>
+	<key>STORAGE_BUCKET</key>
+	<string>parkmywheels-1f3da.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:438168052516:ios:9557b1caf475595b3ac9b1</string>
+</dict>
+</plist>

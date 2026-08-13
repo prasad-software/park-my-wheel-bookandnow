@@ -1,0 +1,300 @@
+﻿    final String bookedTime = vehicle.bookingTime; // e.g., '10:20 PM'
+    DateTime parsedDate = DateFormat('dd-MM-yyyy').parse(vehicle.parkingDate);
+    String formattedDate = formatWithSuffix(parsedDate);
+
+    final String combinedDateTimeString = '$parkingDate $parkingTime';
+    final String bookingcombine = '$bookedDate $bookedTime';
+    DateTime? combinebook;
+    try {
+      combinebook = DateFormat('dd-MM-yyyy hh:mm a').parse(bookingcombine);
+    } catch (e) {
+      print('Error parsing combined date and time: $e');
+      combinebook = null;
+    }
+    String bookcom =
+        combinebook != null
+            ? DateFormat('d MMM, yyyy, hh:mm a').format(combinebook)
+            : 'N/A';
+
+    DateTime? combinedDateTime;
+    try {
+      combinedDateTime = DateFormat(
+        'dd-MM-yyyy hh:mm a',
+      ).parse(combinedDateTimeString);
+    } catch (e) {
+      print('Error parsing combined date and time: $e');
+      combinedDateTime = null;
+    }
+    String formattedDateTime =
+        combinedDateTime != null
+            ? DateFormat('d MMM, yyyy, hh:mm a').format(combinedDateTime)
+            : 'N/A';
+    return GestureDetector(
+      onTap: () {},
+      child: SizedBox(
+        height: 120,
+        child: Stack(
+          children: [
+            Positioned(
+              left: 0,
+              top: 30,
+              right: 0,
+              child: Container(
+                height: 85,
+                decoration: BoxDecoration(
+                  color:
+                      vehicle.status == 'PARKED'
+                          ? ColorUtils.primarycolor()
+                          : ColorUtils.primarycolor(),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(30),
+                    bottomRight: Radius.circular(30),
+                  ),
+                  boxShadow: [
+                    // Moved inside BoxDecoration
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 2,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                alignment: Alignment.bottomCenter, // Center the text
+                child: Padding(
+                  padding: const EdgeInsets.all(
+                    5.0,
+                  ), // Added padding for better spacing
+                  child: Text(
+                    'Booking on : $formattedDate, ${vehicle.parkingTime}',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Column(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(5),
+                      topRight: Radius.circular(5),
+                      bottomLeft: Radius.circular(20),
+                      bottomRight: Radius.circular(20),
+                    ),
+                    // border: Border.all(color: Colors.black, width: 0.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        spreadRadius: 1,
+                        blurRadius: 2,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.only(
+                          left: 14,
+                          top: 2,
+                          right: 0.0,
+                          bottom: 0.0,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color:
+                                  vehicle.status == 'Cancelled'
+                                      ? Colors.red
+                                      : ColorUtils.primarycolor(), // Your primary color
+                              width: 0.5, // Border width
+                            ),
+                          ),
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(5.0),
+                            topRight: Radius.circular(5.0),
+                          ),
+                          color:
+                              vehicle.status == 'Cancelled'
+                                  ? Colors.grey[200]
+                                  : Colors.grey[200],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Vehicle Number
+                            Text(
+                              vehicle.vehicleNumber,
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                color:
+                                    vehicle.status == 'Cancelled'
+                                        ? Colors.red
+                                        : ColorUtils.primarycolor(),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+
+                            // Spacer to push the status and buttons to the right
+                            const Spacer(),
+
+                            // Conditional rendering of status text and buttons
+                            if (vehicle.status == "Cancelled")
+                              Padding(
+                                padding: const EdgeInsets.only(right: 12.0),
+                                child: Text(
+                                  " ${vehicle.cancelledStatus}",
+                                  style: GoogleFonts.poppins(
+                                    color:
+                                        vehicle.status == 'Cancelled'
+                                            ? Colors.red
+                                            : ColorUtils.primarycolor(),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+
+                            // if (vehicle.cancelledStatus
+                            //     ?.isEmpty ??
+                            //     true) // Check if cancelledStatus is empty
+                            //   Padding(
+                            //     padding:
+                            //     const EdgeInsets.only(
+                            //         right: 12.0),
+                            //     child: Text(
+                            //       " ${vehicle.status}", // Display vehicle status if cancelledStatus is empty
+                            //       style:
+                            //       GoogleFonts.poppins(
+                            //         color: vehicle.status ==
+                            //             'Cancelled'
+                            //             ? Colors.red
+                            //             : ColorUtils
+                            //             .primarycolor(),
+                            //         fontWeight:
+                            //         FontWeight.bold,
+                            //       ),
+                            //     ),
+                            //   ),
+                            //
+                            if (vehicle.status == "PARKED")
+                              Padding(
+                                padding: const EdgeInsets.only(top: 3.0, bottom: 5.0),
+                                child: SizedBox(
+                                  height: 25,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Print Button
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          right: 8.0,
+                                        ),
+                                        child: ElevatedButton(
+                                          onPressed: () async {
+                                            // Fetch amount from vendor/fet API
+                                            String currentAmount =
+                                                await UniversalPrintHelper.getPrintAmountFromAPI(
+                                                  vehicle.id,
+                                                );
+
+                                            UniversalPrintHelper.printTicket(
+                                              context: context,
+                                              vendorName:
+                                                  effectivePrintVendorName(
+                                                    vehicle.vendorname,
+                                                    defaultVendorName,
+                                                  ),
+                                              bookingId: vehicle.id,
+                                              invoiceId: vehicle.invoiceid,
+                                              vehicleType: vehicle.vehicletype,
+                                              vehicleNumber:
+                                                  vehicle.vehicleNumber,
+                                              parkingDate: vehicle.parkingDate,
+                                              parkingTime: vehicle.parkingTime,
+                                              amount: currentAmount,
+                                              personName: vehicle.username,
+                                              valetCharge:
+                                                  double.tryParse(
+                                                    vehicle.valetCharge,
+                                                  ) ??
+                                                  0.0,
+                                              mobileNumber:
+                                                  vehicle.mobilenumber,
+                                              vendorId: vendorId,
+                                              bookType: bookType,
+                                              sts: vehicle.sts,
+                                            );
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.white,
+                                            foregroundColor:
+                                                ColorUtils.primarycolor(),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 5,
+                                            ),
+                                            minimumSize: const Size(0, 0),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  const BorderRadius.all(
+                                                    Radius.circular(5),
+                                                  ),
+                                              side: BorderSide(
+                                                color:
+                                                    ColorUtils.primarycolor(),
+                                                width: 0.5,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.print,
+                                                color:
+                                                    ColorUtils.primarycolor(),
+                                                size: 14,
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Text(
+                                                'Print',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color:
+                                                      ColorUtils.primarycolor(),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      // Exit Button
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          right: 8.0,
+                                        ),
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            showModalBottomSheet(
+                                              context: context,
+                                              isScrollControlled: true,
+                                              backgroundColor:
+                                                  Colors.transparent,
+                                              builder: (context) {
+                                                return DraggableScrollableSheet(
+                                                  expand: false,
+                                                  builder: (
+                                                    context,
+                                                    scrollController,
+                                                  ) {
+                                                    return Container(
+                                                      decoration: const BoxDecoration(

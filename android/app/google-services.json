@@ -1,0 +1,76 @@
+{
+  "project_info": {
+    "project_number": "438168052516",
+    "project_id": "parkmywheels-1f3da",
+    "storage_bucket": "parkmywheels-1f3da.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:438168052516:android:6f7e7830308538503ac9b1",
+        "android_client_info": {
+          "package_name": "com.park.mywheels"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "438168052516-sa39nhmthc0i6vm2u0u0sp76op1i02nq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBwllhj7f406OG7zC3ahy3017pkta5Cgik"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "438168052516-sa39nhmthc0i6vm2u0u0sp76op1i02nq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:438168052516:android:113471117ddaa4f93ac9b1",
+        "android_client_info": {
+          "package_name": "com.sensitive.parkmywheels"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "438168052516-fa1b7m1bur91nnap3qco5smethr4i421.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sensitive.parkmywheels",
+            "certificate_hash": "76588ee37df108dcf38a66d8f89eb437e7aa1116"
+          }
+        },
+        {
+          "client_id": "438168052516-sa39nhmthc0i6vm2u0u0sp76op1i02nq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBwllhj7f406OG7zC3ahy3017pkta5Cgik"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "438168052516-sa39nhmthc0i6vm2u0u0sp76op1i02nq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

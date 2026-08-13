@@ -1,0 +1,2595 @@
+﻿diff --git a/lib/auth/vendor/vendorsearch.dart b/lib/auth/vendor/vendorsearch.dart
+index 102463d..d1ec46e 100644
+--- a/lib/auth/vendor/vendorsearch.dart
++++ b/lib/auth/vendor/vendorsearch.dart
+@@ -23,7 +23,8 @@ class vSearchScreen extends StatefulWidget {
+   _vSearchScreenState createState() => _vSearchScreenState();
+ }
+ 
+-class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProviderStateMixin {
++class _vSearchScreenState extends State<vSearchScreen>
++    with SingleTickerProviderStateMixin {
+   List<Map<String, dynamic>> filteredVendors = [];
+   List<Map<String, dynamic>> allVendors = [];
+   TextEditingController searchController = TextEditingController();
+@@ -33,7 +34,8 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+   late TabController _tabController;
+   int _selectedTabIndex = 0;
+   final Map<String, bool> _isExiting = {};
+-  final Map<String, bool> _isCheckingExit = {}; // awaiting amount before showing exit popup
++  final Map<String, bool> _isCheckingExit =
++      {}; // awaiting amount before showing exit popup
+ 
+   static const Duration _printTimeout = Duration(seconds: 18);
+   static const Duration _apiTimeout = Duration(seconds: 20);
+@@ -51,15 +53,21 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+   }
+ 
+   /// Fetch payable amount first. If Γé╣0, exit directly without popup; otherwise show Exitpage.
+-  Future<void> _handleExitButtonPressed(Map<String, dynamic> vehicle, String bookingId) async {
++  Future<void> _handleExitButtonPressed(
++    Map<String, dynamic> vehicle,
++    String bookingId,
++  ) async {
+     if (bookingId.isEmpty || !mounted) return;
+-    if (_isCheckingExit[bookingId] == true || _isExiting[bookingId] == true) return;
++    if (_isCheckingExit[bookingId] == true || _isExiting[bookingId] == true)
++      return;
+ 
+     setState(() => _isCheckingExit[bookingId] = true);
+     try {
+       String amountStr = '0';
+       try {
+-        amountStr = await UniversalPrintHelper.getPrintAmountFromAPI(bookingId).timeout(_apiTimeout);
++        amountStr = await UniversalPrintHelper.getPrintAmountFromAPI(
++          bookingId,
++        ).timeout(_apiTimeout);
+       } catch (_) {}
+ 
+       final amountVal = double.tryParse(amountStr.trim()) ?? 0.0;
+@@ -83,7 +91,9 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+                 return Container(
+                   decoration: const BoxDecoration(
+                     color: Colors.white,
+-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
++                    borderRadius: BorderRadius.vertical(
++                      top: Radius.circular(20),
++                    ),
+                   ),
+                   child: Exitpage(
+                     currentTabIndex: 0,
+@@ -91,11 +101,13 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+                     otp: vehicle['otp'] ?? '',
+                     vehicletype: vehicle['vehicleType'] ?? '',
+                     bookingid: bookingId,
+-                    parkingdate: vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '',
++                    parkingdate:
++                        vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '',
+                     vehiclenumber: vehicle['vehicleNumber'] ?? '',
+                     username: vehicle['personName'] ?? '',
+                     phoneno: vehicle['mobileNumber'] ?? '',
+-                    parkingtime: vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
++                    parkingtime:
++                        vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
+                     bookingtypetemporary: vehicle['status'] ?? '',
+                     sts: vehicle['sts'] ?? '',
+                     cartype: vehicle['carType'] ?? '',
+@@ -118,7 +130,7 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+   void initState() {
+     super.initState();
+     print('initState: Fetching vendors for vendorid: ${widget.vendorid}');
+-    
++
+     _tabController = TabController(length: 2, vsync: this);
+     _tabController.addListener(() {
+       if (_tabController.indexIsChanging) return;
+@@ -147,24 +159,32 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+   void updatePayableTimes() {
+     if (!mounted) return;
+ 
+-    print('updatePayableTimes: Updating payable times for ${filteredVendors.length} vehicles');
++    print(
++      'updatePayableTimes: Updating payable times for ${filteredVendors.length} vehicles',
++    );
+     setState(() {
+-      filteredVendors = filteredVendors.map((vehicle) {
+-        if (vehicle['status'] == 'PARKED' || vehicle['status'] == 'parked') {
+-          try {
+-            final parkedDateTime = _parseDateTime(
+-              vehicle['parkedDate'] ?? vehicle['parkingDate'],
+-              vehicle['parkedTime'] ?? vehicle['parkingTime'],
+-            );
+-            final elapsed = DateTime.now().difference(parkedDateTime);
+-            vehicle['payableDuration'] = elapsed;
+-            print('updatePayableTimes: Vehicle ${vehicle['vehicleNumber']} duration: $elapsed');
+-          } catch (e) {
+-            print('updatePayableTimes: Error calculating payable time for ${vehicle['vehicleNumber']}: $e');
+-          }
+-        }
+-        return vehicle;
+-      }).toList();
++      filteredVendors =
++          filteredVendors.map((vehicle) {
++            if (vehicle['status'] == 'PARKED' ||
++                vehicle['status'] == 'parked') {
++              try {
++                final parkedDateTime = _parseDateTime(
++                  vehicle['parkedDate'] ?? vehicle['parkingDate'],
++                  vehicle['parkedTime'] ?? vehicle['parkingTime'],
++                );
++                final elapsed = DateTime.now().difference(parkedDateTime);
++                vehicle['payableDuration'] = elapsed;
++                print(
++                  'updatePayableTimes: Vehicle ${vehicle['vehicleNumber']} duration: $elapsed',
++                );
++              } catch (e) {
++                print(
++                  'updatePayableTimes: Error calculating payable time for ${vehicle['vehicleNumber']}: $e',
++                );
++              }
++            }
++            return vehicle;
++          }).toList();
+     });
+   }
+ 
+@@ -179,7 +199,14 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+       final timeFormat = DateFormat('hh:mm a');
+       final time = timeFormat.parse(timeStr);
+ 
+-      final parsedDateTime = DateTime(year, month, day, time.hour, time.minute, time.second);
++      final parsedDateTime = DateTime(
++        year,
++        month,
++        day,
++        time.hour,
++        time.minute,
++        time.second,
++      );
+       print('parseDateTime: Successfully parsed to $parsedDateTime');
+       return parsedDateTime;
+     } catch (e) {
+@@ -198,7 +225,9 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+       final year = int.parse(dateParts[2]);
+       return DateTime(year, month, day);
+     } catch (e) {
+-      print('parseSubscriptionEndDate: Error parsing end date: $endDateStr - $e');
++      print(
++        'parseSubscriptionEndDate: Error parsing end date: $endDateStr - $e',
++      );
+       return null;
+     }
+   }
+@@ -222,7 +251,11 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+       });
+ 
+       final response = await http
+-          .get(Uri.parse('${ApiConfig.baseUrl}vendor/searchscreen/${widget.vendorid}'))
++          .get(
++            Uri.parse(
++              '${ApiConfig.baseUrl}vendor/searchscreen/${widget.vendorid}',
++            ),
++          )
+           .timeout(_apiTimeout);
+ 
+       List<Map<String, dynamic>> combinedList = [];
+@@ -236,8 +269,9 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+           final String id =
+               booking['_id']?.toString() ?? booking['id']?.toString() ?? '';
+           if (id.isNotEmpty) {
+-            final Map<String, dynamic> vehicleMap =
+-                Map<String, dynamic>.from(booking as Map);
++            final Map<String, dynamic> vehicleMap = Map<String, dynamic>.from(
++              booking as Map,
++            );
+             vehicleMap['_id'] = id;
+             vehicleMap['id'] = id;
+             combinedList.add(vehicleMap);
+@@ -258,20 +292,29 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+       for (var vehicle in combinedList) {
+         vehicle['vehicleNumber'] ??= 'Unknown';
+         vehicle['status'] ??= 'Unknown';
+-        
++
+         // Normalize date/time keys
+-        final String pDate = vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? DateFormat('dd-MM-yyyy').format(DateTime.now());
+-        final String pTime = vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? DateFormat('hh:mm a').format(DateTime.now());
+-        
++        final String pDate =
++            vehicle['parkedDate'] ??
++            vehicle['parkingDate'] ??
++            DateFormat('dd-MM-yyyy').format(DateTime.now());
++        final String pTime =
++            vehicle['parkedTime'] ??
++            vehicle['parkingTime'] ??
++            DateFormat('hh:mm a').format(DateTime.now());
++
+         vehicle['parkedDate'] = pDate;
+         vehicle['parkingDate'] = pDate;
+         vehicle['parkedTime'] = pTime;
+         vehicle['parkingTime'] = pTime;
+         vehicle['vehicleType'] ??= 'Unknown';
+         // Use subsctiptiontype (typo in DB) if sts is missing for subscriptions
+-        vehicle['sts'] = (vehicle['sts'] != null && vehicle['sts'].toString().isNotEmpty && vehicle['sts'] != 'Unknown')
+-            ? vehicle['sts']
+-            : (vehicle['subsctiptiontype'] ?? 'Unknown');
++        vehicle['sts'] =
++            (vehicle['sts'] != null &&
++                    vehicle['sts'].toString().isNotEmpty &&
++                    vehicle['sts'] != 'Unknown')
++                ? vehicle['sts']
++                : (vehicle['subsctiptiontype'] ?? 'Unknown');
+ 
+         if (vehicle['status'].toString().toLowerCase() == 'parked' &&
+             isVendorShortParkingSts(vehicle['sts'])) {
+@@ -280,9 +323,13 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+               vehicle['parkedDate'],
+               vehicle['parkedTime'],
+             );
+-            vehicle['payableDuration'] = DateTime.now().difference(parkedDateTime);
++            vehicle['payableDuration'] = DateTime.now().difference(
++              parkedDateTime,
++            );
+           } catch (e) {
+-            print('fetchVendors: Error initializing payable time for ${vehicle['vehicleNumber']}: $e');
++            print(
++              'fetchVendors: Error initializing payable time for ${vehicle['vehicleNumber']}: $e',
++            );
+             vehicle['payableDuration'] = Duration.zero;
+           }
+         }
+@@ -290,8 +337,14 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+ 
+       // Sort by latest first
+       combinedList.sort((a, b) {
+-        final createdAtA = a['createdAt'] != null ? DateTime.parse(a['createdAt']) : DateTime(0);
+-        final createdAtB = b['createdAt'] != null ? DateTime.parse(b['createdAt']) : DateTime(0);
++        final createdAtA =
++            a['createdAt'] != null
++                ? DateTime.parse(a['createdAt'])
++                : DateTime(0);
++        final createdAtB =
++            b['createdAt'] != null
++                ? DateTime.parse(b['createdAt'])
++                : DateTime(0);
+         return createdAtB.compareTo(createdAtA);
+       });
+ 
+@@ -300,9 +353,10 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+         filterVendors(searchController.text);
+         isLoading = false;
+       });
+-      
+-      print('fetchVendors: Loaded ${allVendors.length} total bookings from merged APIs');
+ 
++      print(
++        'fetchVendors: Loaded ${allVendors.length} total bookings from merged APIs',
++      );
+     } catch (e) {
+       print('fetchVendors: Error occurred - $e');
+       setState(() {
+@@ -314,13 +368,13 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+ 
+   bool _isSameDay(String dateStr1, String dateStr2) {
+     if (dateStr1.isEmpty || dateStr2.isEmpty) return false;
+-    
++
+     // Normalize dates to handle leading zeros (e.g., 2-5-2025 vs 02-05-2025)
+     DateTime? d1 = _parseFlexibleDate(dateStr1);
+     DateTime? d2 = _parseFlexibleDate(dateStr2);
+-    
++
+     if (d1 == null || d2 == null) return dateStr1 == dateStr2;
+-    
++
+     return d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
+   }
+ 
+@@ -351,18 +405,18 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+   bool _subscriptionPassStillActive(Map<String, dynamic> booking) {
+     final sts = booking['sts']?.toString() ?? '';
+     if (!isSubscriptionSts(sts)) return false;
+-    
++
+     // If it has an exit date, it's definitely completed
+     final exitDate = booking['exitvehicledate']?.toString() ?? '';
+     if (exitDate.trim().isNotEmpty) return false;
+-    
++
+     final endRaw = (booking['subsctiptionenddate'] ?? '').toString().trim();
+     if (endRaw.isEmpty) return false;
+-    
++
+     try {
+       final endOnly = _parseFlexibleDate(endRaw.split(' ').first);
+       if (endOnly == null) return false;
+-      
++
+       final now = DateTime.now();
+       final today = DateTime(now.year, now.month, now.day);
+       return !today.isAfter(endOnly);
+@@ -387,19 +441,23 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+ 
+     _setExiting(bookingId, true);
+     try {
+-      print('Print & Exit: Starting for ${vehicle['vehicleNumber']} (ID: $bookingId)');
++      print(
++        'Print & Exit: Starting for ${vehicle['vehicleNumber']} (ID: $bookingId)',
++      );
+ 
+       String currentAmount;
+       try {
+-        currentAmount = await UniversalPrintHelper
+-            .getPrintAmountFromAPI(bookingId)
+-            .timeout(_apiTimeout);
++        currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(
++          bookingId,
++        ).timeout(_apiTimeout);
+       } on TimeoutException {
+         currentAmount = '0';
+         if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(
+-              content: Text('Could not fetch amount in time. Continuing with exit...'),
++              content: Text(
++                'Could not fetch amount in time. Continuing with exit...',
++              ),
+             ),
+           );
+         }
+@@ -409,7 +467,8 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+       try {
+         await UniversalPrintHelper.printTicket(
+           context: context,
+-          vendorName: vehicle['vendorName'] ?? vehicle['vendorname'] ?? 'Vendor',
++          vendorName:
++              vehicle['vendorName'] ?? vehicle['vendorname'] ?? 'Vendor',
+           bookingId: bookingId,
+           invoiceId: vehicle['invoiceid']?.toString(),
+           vehicleType: vehicle['vehicleType'] ?? '',
+@@ -418,7 +477,8 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+           parkingTime: vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
+           amount: currentAmount,
+           personName: vehicle['personName'] ?? '',
+-          valetCharge: double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0,
++          valetCharge:
++              double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0,
+           mobileNumber: vehicle['mobileNumber'] ?? '',
+           vendorId: vehicle['vendorId'] ?? widget.vendorid,
+           bookType: vehicle['bookType'] ?? '',
+@@ -448,9 +508,9 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+       print('Print & Exit: Error: $e');
+       if (mounted) {
+         final msg = e.toString().replaceFirst('Exception: ', '');
+-        ScaffoldMessenger.of(context).showSnackBar(
+-          SnackBar(content: Text('Exit failed: $msg')),
+-        );
++        ScaffoldMessenger.of(
++          context,
++        ).showSnackBar(SnackBar(content: Text('Exit failed: $msg')));
+       }
+     } finally {
+       _setExiting(bookingId, false);
+@@ -462,7 +522,8 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+     String amount, {
+     bool manageLoading = true,
+   }) async {
+-    final String bookingId = vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? '';
++    final String bookingId =
++        vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? '';
+     if (bookingId.isEmpty) {
+       print('QuickExit: Error - No ID found in vehicle map: $vehicle');
+       if (mounted) {
+@@ -479,7 +540,9 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+ 
+     try {
+       print('QuickExit: Starting exit flow for $bookingId');
+-      final url = Uri.parse('${ApiConfig.baseUrl}vendor/exitvehicle/$bookingId');
++      final url = Uri.parse(
++        '${ApiConfig.baseUrl}vendor/exitvehicle/$bookingId',
++      );
+ 
+       // Robust date parsing using keys normalized in fetchVendors
+       final parkedDate = vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '';
+@@ -487,7 +550,8 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+ 
+       print('QuickExit: Using dates - Date: $parkedDate, Time: $parkedTime');
+ 
+-      final parkedDateTime = UniversalPrintHelper.tryParseDateTime(
++      final parkedDateTime =
++          UniversalPrintHelper.tryParseDateTime(
+             date: parkedDate,
+             time: parkedTime,
+           ) ??
+@@ -505,12 +569,15 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+         'paymentMode': 'Cash',
+       };
+ 
+-      final userId = (vehicle['userid'] ?? vehicle['userId'] ?? '').toString().trim();
++      final userId =
++          (vehicle['userid'] ?? vehicle['userId'] ?? '').toString().trim();
+       if (userId.isNotEmpty) {
+         try {
+           final gstData = await _fetchGstFeeForExit().timeout(_apiTimeout);
+-          final gstPercentage = double.tryParse(gstData['gst']?.toString() ?? '0') ?? 0.0;
+-          final handlingFeeAmount = double.tryParse(gstData['handlingfee']?.toString() ?? '0') ?? 0.0;
++          final gstPercentage =
++              double.tryParse(gstData['gst']?.toString() ?? '0') ?? 0.0;
++          final handlingFeeAmount =
++              double.tryParse(gstData['handlingfee']?.toString() ?? '0') ?? 0.0;
+           final gstBase = parkingCharge + handlingFeeAmount;
+           final gstAmount = (gstBase * gstPercentage) / 100;
+           final exactTotal = parkingCharge + handlingFeeAmount + gstAmount;
+@@ -519,18 +586,20 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+           requestBody['handlingfee'] = handlingFeeAmount;
+           requestBody['totalamout'] = finalTotal;
+         } catch (e) {
+-          print('QuickExit: GST fee fetch failed, continuing without tax fields: $e');
++          print(
++            'QuickExit: GST fee fetch failed, continuing without tax fields: $e',
++          );
+         }
+       }
+ 
+-      print('QuickExit: Request payload - Amount: $parkingCharge, Duration: $formattedDuration');
++      print(
++        'QuickExit: Request payload - Amount: $parkingCharge, Duration: $formattedDuration',
++      );
+ 
+       final response = await http
+           .put(
+             url,
+-            headers: {
+-              'Content-Type': 'application/json',
+-            },
++            headers: {'Content-Type': 'application/json'},
+             body: jsonEncode(requestBody),
+           )
+           .timeout(_exitApiTimeout);
+@@ -540,7 +609,9 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+       if (response.statusCode == 200) {
+         if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+-            const SnackBar(content: Text('Vehicle exited successfully (Cash)!')),
++            const SnackBar(
++              content: Text('Vehicle exited successfully (Cash)!'),
++            ),
+           );
+           fetchVendors();
+         }
+@@ -565,42 +636,47 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+   void filterVendors(String query) {
+     print('filterVendors: Filtering query: $query, tab: $_selectedTabIndex');
+     setState(() {
+-      filteredVendors = allVendors.where((v) {
+-        final status = v['status']?.toString().toUpperCase() ?? '';
+-        final vehicleNumber = v['vehicleNumber']?.toString().toLowerCase() ?? '';
+-        
+-        // Tab Filtering
+-        if (_selectedTabIndex == 0) {
+-          // On Parking Tab: Show PARKED or BOOKED status
+-          bool isParked = (status == 'PARKED' || status == 'BOOKED' || v['status'].toString().toLowerCase() == 'parked');
+-          
+-          // Dashboard consistency: Weekly/monthly from machinecreatebooking use COMPLETED; keep on list until pass end date.
+-          if (status == 'COMPLETED' && _subscriptionPassStillActive(v)) {
+-            isParked = true;
+-          }
+-          
+-          if (!isParked) return false;
+-        } else if (_selectedTabIndex == 1) {
+-          // Completed Tab: Show strictly COMPLETED status
+-          bool isFinished = (status == 'COMPLETED');
+-          
+-          // If it's an active subscription, it belongs in "On Parking", not here.
+-          if (isFinished && _subscriptionPassStillActive(v)) {
+-            isFinished = false;
+-          }
+-          
+-          if (!isFinished) return false;
+-          
+-          // Dashboard consistency: Strictly only show today's completed bookings, even when searching
+-          final today = DateFormat('dd-MM-yyyy').format(DateTime.now());
+-          final exitDate = v['exitvehicledate']?.toString() ?? '';
+-          
+-          if (!_isSameDay(exitDate, today)) return false;
+-        }
+-        
+-        // Search Query Filtering
+-        return vehicleNumber.contains(query.toLowerCase());
+-      }).toList();
++      filteredVendors =
++          allVendors.where((v) {
++            final status = v['status']?.toString().toUpperCase() ?? '';
++            final vehicleNumber =
++                v['vehicleNumber']?.toString().toLowerCase() ?? '';
++
++            // Tab Filtering
++            if (_selectedTabIndex == 0) {
++              // On Parking Tab: Show PARKED or BOOKED status
++              bool isParked =
++                  (status == 'PARKED' ||
++                      status == 'BOOKED' ||
++                      v['status'].toString().toLowerCase() == 'parked');
++
++              // Dashboard consistency: Weekly/monthly from machinecreatebooking use COMPLETED; keep on list until pass end date.
++              if (status == 'COMPLETED' && _subscriptionPassStillActive(v)) {
++                isParked = true;
++              }
++
++              if (!isParked) return false;
++            } else if (_selectedTabIndex == 1) {
++              // Completed Tab: Show strictly COMPLETED status
++              bool isFinished = (status == 'COMPLETED');
++
++              // If it's an active subscription, it belongs in "On Parking", not here.
++              if (isFinished && _subscriptionPassStillActive(v)) {
++                isFinished = false;
++              }
++
++              if (!isFinished) return false;
++
++              // Dashboard consistency: Strictly only show today's completed bookings, even when searching
++              final today = DateFormat('dd-MM-yyyy').format(DateTime.now());
++              final exitDate = v['exitvehicledate']?.toString() ?? '';
++
++              if (!_isSameDay(exitDate, today)) return false;
++            }
++
++            // Search Query Filtering
++            return vehicleNumber.contains(query.toLowerCase());
++          }).toList();
+       print('filterVendors: Results: ${filteredVendors.length}');
+     });
+   }
+@@ -614,7 +690,9 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+ 
+   /// Same endpoint as [Exitpage] in paytimeamount.dart ΓÇö used for quick exit GST parity.
+   Future<Map<String, dynamic>> _fetchGstFeeForExit() async {
+-    final response = await http.get(Uri.parse('${ApiConfig.baseUrl}vendor/getgstfee'));
++    final response = await http.get(
++      Uri.parse('${ApiConfig.baseUrl}vendor/getgstfee'),
++    );
+     if (response.statusCode == 200) {
+       final data = json.decode(response.body);
+       if (data is List && data.isNotEmpty && data[0] is Map) {
+@@ -650,7 +728,11 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+     return '$day$suffix ${DateFormat('MMMM yyyy').format(date)}';
+   }
+ 
+-  DateTime? _calculateSubscriptionEndDate(String dateStr, String timeStr, String sts) {
++  DateTime? _calculateSubscriptionEndDate(
++    String dateStr,
++    String timeStr,
++    String sts,
++  ) {
+     try {
+       final startDateTime = _parseDateTime(dateStr, timeStr);
+       int days = 30; // default
+@@ -681,7 +763,9 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+       endDate = _calculateSubscriptionEndDate(
+         vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '',
+         vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
+-        vehicle['sts']?.toString() ?? vehicle['subsctiptiontype']?.toString() ?? '',
++        vehicle['sts']?.toString() ??
++            vehicle['subsctiptiontype']?.toString() ??
++            '',
+       );
+     }
+ 
+@@ -693,7 +777,11 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+       final rawStart = vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '';
+       if (rawStart.isNotEmpty) {
+         final parts = rawStart.split('-');
+-        startDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
++        startDate = DateTime(
++          int.parse(parts[2]),
++          int.parse(parts[1]),
++          int.parse(parts[0]),
++        );
+       }
+     } catch (_) {}
+ 
+@@ -706,7 +794,11 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+     }
+ 
+     if (startDate != null) {
+-      final startOnly = DateTime(startDate.year, startDate.month, startDate.day);
++      final startOnly = DateTime(
++        startDate.year,
++        startDate.month,
++        startDate.day,
++      );
+       if (today.isBefore(startOnly)) {
+         // Subscription hasn't started yet ΓÇö show full period
+         final days = endOnly.difference(startOnly).inDays;
+@@ -723,12 +815,14 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+ 
+   @override
+   Widget build(BuildContext context) {
+-    print('build: isLoading: $isLoading, hasError: $hasError, filteredVendors Length: ${filteredVendors.length}');
++    print(
++      'build: isLoading: $isLoading, hasError: $hasError, filteredVendors Length: ${filteredVendors.length}',
++    );
+     return Scaffold(
+-      backgroundColor: ColorUtils.secondarycolor(),
++      backgroundColor: Colors.white,
+       appBar: AppBar(
+         titleSpacing: 0,
+-        backgroundColor: ColorUtils.secondarycolor(),
++        backgroundColor: Colors.white,
+         iconTheme: const IconThemeData(color: Colors.black),
+         title: Text(
+           'Search Parking Booking',
+@@ -740,96 +834,106 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+           padding: const EdgeInsets.all(8.0),
+           child: Column(
+             children: [
+-            const SizedBox(height: 10),
+-            Padding(
+-              padding: const EdgeInsets.symmetric(horizontal: 7),
+-              child: TextFormField(
+-                controller: searchController,
+-                autofocus: true, // Enable autofocus to make the textbox active on page entry
+-                onChanged: filterVendors,
+-                decoration: InputDecoration(
+-                  filled: true,
+-                  fillColor: const Color(0xFFF1F2F3),
+-                  border: OutlineInputBorder(
+-                    borderSide: BorderSide(
+-                      color: ColorUtils.primarycolor(),
+-                      width: 0.5,
++              Padding(
++                padding: const EdgeInsets.symmetric(horizontal: 7),
++                child: TextFormField(
++                  controller: searchController,
++                  autofocus:
++                      true, // Enable autofocus to make the textbox active on page entry
++                  onChanged: filterVendors,
++                  decoration: InputDecoration(
++                    filled: true,
++                    fillColor: const Color(0xFFF1F2F3),
++                    border: OutlineInputBorder(
++                      borderSide: BorderSide(
++                        color: ColorUtils.primarycolor(),
++                        width: 0.5,
++                      ),
++                      borderRadius: BorderRadius.circular(5),
+                     ),
+-                    borderRadius: BorderRadius.circular(5),
+-                  ),
+-                  enabledBorder: OutlineInputBorder(
+-                    borderRadius: BorderRadius.circular(5),
+-                    borderSide: BorderSide(
+-                      color: ColorUtils.primarycolor(),
+-                      width: 0.5,
++                    enabledBorder: OutlineInputBorder(
++                      borderRadius: BorderRadius.circular(5),
++                      borderSide: BorderSide(
++                        color: ColorUtils.primarycolor(),
++                        width: 0.5,
++                      ),
+                     ),
+-                  ),
+-                  focusedBorder: OutlineInputBorder(
+-                    borderRadius: BorderRadius.circular(5),
+-                    borderSide: BorderSide(
+-                      color: ColorUtils.primarycolor(),
+-                      width: 0.5,
++                    focusedBorder: OutlineInputBorder(
++                      borderRadius: BorderRadius.circular(5),
++                      borderSide: BorderSide(
++                        color: ColorUtils.primarycolor(),
++                        width: 0.5,
++                      ),
+                     ),
+-                  ),
+-                  prefixIcon: GestureDetector(
+-                    onTap: () {
+-                      print('build: Search icon tapped, reloading vSearchScreen');
+-                      Navigator.pushReplacement(
+-                        context,
+-                        MaterialPageRoute(
+-                            builder: (context) => vSearchScreen(vendorid: widget.vendorid)),
+-                      );
+-                    },
+-                    child: Icon(
+-                      Icons.search,
+-                      color: ColorUtils.primarycolor(),
++                    prefixIcon: GestureDetector(
++                      onTap: () {
++                        print(
++                          'build: Search icon tapped, reloading vSearchScreen',
++                        );
++                        Navigator.pushReplacement(
++                          context,
++                          MaterialPageRoute(
++                            builder:
++                                (context) =>
++                                    vSearchScreen(vendorid: widget.vendorid),
++                          ),
++                        );
++                      },
++                      child: Icon(
++                        Icons.search,
++                        color: ColorUtils.primarycolor(),
++                      ),
++                    ),
++                    constraints: const BoxConstraints(
++                      maxHeight: 40,
++                      maxWidth: double.infinity,
++                    ),
++                    contentPadding: const EdgeInsets.symmetric(
++                      vertical: 8,
++                      horizontal: 12,
++                    ),
++                    hintText: 'Search',
++                    hintStyle: GoogleFonts.poppins(
++                      fontWeight: FontWeight.w300,
++                      fontSize: 14,
++                      color: Colors.black,
+                     ),
+                   ),
+-                  constraints: const BoxConstraints(
+-                    maxHeight: 40,
+-                    maxWidth: double.infinity,
++                ),
++              ),
++              const SizedBox(height: 10),
++              Expanded(
++                child: TabContainer(
++                  controller: _tabController,
++                  duration: Duration.zero,
++                  childDuration: Duration.zero,
++                  borderRadius: BorderRadius.circular(10),
++                  tabEdge: TabEdge.top,
++                  curve: Curves.easeIn,
++                  colors: <Color>[
++                    ColorUtils.primarycolor(),
++                    ColorUtils.primarycolor(),
++                  ],
++                  selectedTextStyle: GoogleFonts.poppins(
++                    fontSize: 15.0,
++                    fontWeight: FontWeight.bold,
++                    color: Colors.white,
+                   ),
+-                  contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+-                  hintText: 'Search',
+-                  hintStyle: GoogleFonts.poppins(
+-                    fontWeight: FontWeight.w300,
+-                    fontSize: 14,
++                  unselectedTextStyle: GoogleFonts.poppins(
++                    fontSize: 13.0,
+                     color: Colors.black,
+                   ),
++                  tabs: const [Text('On Parking'), Text('Completed')],
++                  children: [
++                    Container(color: Colors.white, child: _buildBookingList()),
++                    Container(color: Colors.white, child: _buildBookingList()),
++                  ],
+                 ),
+               ),
+-            ),
+-            const SizedBox(height: 10),
+-            Expanded(
+-              child: TabContainer(
+-                controller: _tabController,
+-                borderRadius: BorderRadius.circular(10),
+-                tabEdge: TabEdge.top,
+-                curve: Curves.easeIn,
+-                colors: const <Color>[Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
+-                selectedTextStyle: GoogleFonts.poppins(
+-                  fontSize: 15.0,
+-                  fontWeight: FontWeight.bold,
+-                  color: ColorUtils.primarycolor(),
+-                ),
+-                unselectedTextStyle: GoogleFonts.poppins(
+-                  fontSize: 13.0,
+-                  color: Colors.black,
+-                ),
+-                tabs: const [
+-                  Text('On Parking'),
+-                  Text('Completed'),
+-                ],
+-                children: [
+-                  _buildBookingList(),
+-                  _buildBookingList(),
+-                ],
+-              ),
+-            ),
+-          ],
++            ],
++          ),
+         ),
+       ),
+-    ),
+     );
+   }
+ 
+@@ -839,710 +943,1158 @@ class _vSearchScreenState extends State<vSearchScreen> with SingleTickerProvider
+     }
+     return hasError
+         ? Center(
+-            child: Column(
+-              mainAxisAlignment: MainAxisAlignment.center,
+-              children: [
+-                const Text('Failed to load data'),
+-                const SizedBox(height: 10),
+-                ElevatedButton(
+-                  onPressed: fetchVendors,
+-                  child: const Text('Retry'),
+-                ),
+-              ],
+-            ),
+-          )
++          child: Column(
++            mainAxisAlignment: MainAxisAlignment.center,
++            children: [
++              const Text('Failed to load data'),
++              const SizedBox(height: 10),
++              ElevatedButton(
++                onPressed: fetchVendors,
++                child: const Text('Retry'),
++              ),
++            ],
++          ),
++        )
+         : filteredVendors.isEmpty
+-            ? Center(
+-                child: Text(
+-                  _selectedTabIndex == 0
+-                      ? 'No Active Parked Vehicles Found'
+-                      : 'No Completed Bookings Found',
+-                  style: GoogleFonts.poppins(),
+-                ),
+-              )
+-            : ListView.builder(
+-                itemCount: filteredVendors.length,
+-                itemBuilder: (context, index) {
+-                  final vehicle = filteredVendors[index];
+-                  final String rowBookingId = vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? '';
+-
+-                  if (_selectedTabIndex == 1) {
+-                    final bookingData = Bookingdata.fromJson(vehicle);
+-                    return vendordashright(
+-                      vehicle: bookingData,
+-                      vendorId: widget.vendorid,
+-                      bookType: bookingData.bookType,
+-                    );
+-                  }
+-                  final payableDuration =
+-                      vehicle['payableDuration'] as Duration? ?? Duration.zero;
+-                  final formattedPayableDuration = _formatDuration(payableDuration);
+-
+-                  final parkedDate = vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '';
+-                  final parkedTime = vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '';
+-
+-                  DateTime parsedDate = DateTime.now();
+-                  if (parkedDate.isNotEmpty && parkedTime.isNotEmpty) {
+-                    try {
+-                      parsedDate = _parseDateTime(parkedDate, parkedTime);
+-                    } catch (e) {
+-                      print('build: Error parsing date for ${vehicle['vehicleNumber']}: $e');
+-                    }
+-                  }
+-
+-                  final isSubscription = isSubscriptionSts(vehicle['sts']?.toString()) || isSubscriptionSts(vehicle['subsctiptiontype']?.toString());
+-                  final remainingDaysMessage =
+-                  isSubscription ? getRemainingDaysMessage(vehicle) : '';
+-                  return GestureDetector(
+-                    onTap: () {
+-                      print('build: Vehicle ${vehicle['vehicleNumber']} tapped');
+-                      // Add navigation logic if needed
+-                    },
+-                    child: SizedBox(
+-                      height: 120,
+-                      child: Stack(
+-                        children: [
+-                          Positioned(
+-                            left: 0,
+-                            top: 30,
+-                            right: 0,
+-                            child: Container(
+-                              height: 85,
+-                              decoration: BoxDecoration(
+-                                color: ColorUtils.primarycolor(),
+-                                borderRadius: const BorderRadius.only(
+-                                  bottomLeft: Radius.circular(30),
+-                                  bottomRight: Radius.circular(30),
+-                                ),
+-                                boxShadow: [
+-                                  BoxShadow(
+-                                    color: Colors.black.withOpacity(0.1),
+-                                    spreadRadius: 1,
+-                                    blurRadius: 2,
+-                                    offset: const Offset(0, 3),
+-                                  ),
+-                                ],
+-                              ),
+-                              alignment: Alignment.bottomCenter,
+-                              child: Padding(
+-                                padding: const EdgeInsets.all(5.0),
+-                                child: Text(
+-                                  ' ${formatWithSuffix(parsedDate)}, $parkedTime',
+-                                  style: GoogleFonts.poppins(
+-                                    color: Colors.white,
+-                                    fontWeight: FontWeight.bold,
+-                                    fontSize: 14,
+-                                  ),
+-                                ),
+-                              ),
++        ? Center(
++          child: Text(
++            _selectedTabIndex == 0
++                ? 'No Active Parked Vehicles Found'
++                : 'No Completed Bookings Found',
++            style: GoogleFonts.poppins(),
++          ),
++        )
++        : ListView.separated(
++          padding: const EdgeInsets.only(top: 15),
++          itemCount: filteredVendors.length,
++          separatorBuilder:
++              (context, index) =>
++                  SizedBox(height: _selectedTabIndex == 1 ? 10 : 8),
++          itemBuilder: (context, index) {
++            final vehicle = filteredVendors[index];
++            final String rowBookingId =
++                vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? '';
++
++            if (_selectedTabIndex == 1) {
++              final bookingData = Bookingdata.fromJson(vehicle);
++              return vendordashright(
++                vehicle: bookingData,
++                vendorId: widget.vendorid,
++                bookType: bookingData.bookType,
++              );
++            }
++            final payableDuration =
++                vehicle['payableDuration'] as Duration? ?? Duration.zero;
++            final formattedPayableDuration = _formatDuration(payableDuration);
++
++            final parkedDate =
++                vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '';
++            final parkedTime =
++                vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '';
++
++            DateTime parsedDate = DateTime.now();
++            if (parkedDate.isNotEmpty && parkedTime.isNotEmpty) {
++              try {
++                parsedDate = _parseDateTime(parkedDate, parkedTime);
++              } catch (e) {
++                print(
++                  'build: Error parsing date for ${vehicle['vehicleNumber']}: $e',
++                );
++              }
++            }
++
++            final isSubscription =
++                isSubscriptionSts(vehicle['sts']?.toString()) ||
++                isSubscriptionSts(vehicle['subsctiptiontype']?.toString());
++            final remainingDaysMessage =
++                isSubscription ? getRemainingDaysMessage(vehicle) : '';
++            return GestureDetector(
++              onTap: () {
++                print('build: Vehicle ${vehicle['vehicleNumber']} tapped');
++                // Add navigation logic if needed
++              },
++              child: SizedBox(
++                height: 120,
++                child: Stack(
++                  children: [
++                    Positioned(
++                      left: 0,
++                      top: 30,
++                      right: 0,
++                      child: Container(
++                        height: 85,
++                        decoration: BoxDecoration(
++                          color: ColorUtils.primarycolor(),
++                          borderRadius: const BorderRadius.only(
++                            bottomLeft: Radius.circular(30),
++                            bottomRight: Radius.circular(30),
++                          ),
++                          boxShadow: [
++                            BoxShadow(
++                              color: Colors.black.withOpacity(0.1),
++                              spreadRadius: 1,
++                              blurRadius: 2,
++                              offset: const Offset(0, 3),
++                            ),
++                          ],
++                        ),
++                        alignment: Alignment.bottomCenter,
++                        child: Padding(
++                          padding: const EdgeInsets.all(5.0),
++                          child: Text(
++                            'Booking on : ${formatWithSuffix(parsedDate)}, $parkedTime',
++                            style: GoogleFonts.poppins(
++                              color: Colors.white,
++                              fontWeight: FontWeight.bold,
++                              fontSize: 14,
+                             ),
+                           ),
+-                          Column(
++                        ),
++                      ),
++                    ),
++                    Column(
++                      children: [
++                        Container(
++                          decoration: BoxDecoration(
++                            color: Colors.grey[200],
++                            borderRadius: const BorderRadius.only(
++                              topLeft: Radius.circular(5),
++                              topRight: Radius.circular(5),
++                              bottomLeft: Radius.circular(20),
++                              bottomRight: Radius.circular(20),
++                            ),
++                            boxShadow: [
++                              BoxShadow(
++                                color: Colors.black.withOpacity(0.1),
++                                spreadRadius: 1,
++                                blurRadius: 2,
++                                offset: const Offset(0, 3),
++                              ),
++                            ],
++                          ),
++                          child: Column(
++                            crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                               Container(
++                                padding: const EdgeInsets.only(
++                                  left: 14,
++                                  top: 2,
++                                  right: 0.0,
++                                  bottom: 0.0,
++                                ),
+                                 decoration: BoxDecoration(
+-                                  color: Colors.white,
++                                  border: Border(
++                                    bottom: BorderSide(
++                                      color: ColorUtils.primarycolor(),
++                                      width: 0.5,
++                                    ),
++                                  ),
+                                   borderRadius: const BorderRadius.only(
+-                                    topLeft: Radius.circular(5),
+-                                    topRight: Radius.circular(5),
+-                                    bottomLeft: Radius.circular(20),
+-                                    bottomRight: Radius.circular(20),
++                                    topLeft: Radius.circular(5.0),
++                                    topRight: Radius.circular(5.0),
+                                   ),
+-                                  boxShadow: [
+-                                    BoxShadow(
+-                                      color: Colors.black.withOpacity(0.1),
+-                                      spreadRadius: 1,
+-                                      blurRadius: 2,
+-                                      offset: const Offset(0, 3),
+-                                    ),
+-                                  ],
++                                  color: Colors.grey[200],
+                                 ),
+-                                child: Column(
+-                                  crossAxisAlignment: CrossAxisAlignment.start,
++                                child: Row(
++                                  mainAxisAlignment:
++                                      MainAxisAlignment.spaceBetween,
+                                   children: [
+-                                    Container(
+-                                      padding: const EdgeInsets.only(
+-                                          left: 14, top: 2, right: 0.0, bottom: 0.0),
+-                                      decoration: BoxDecoration(
+-                                        border: Border(
+-                                          bottom: BorderSide(
+-                                            color: ColorUtils.primarycolor(),
+-                                            width: 0.5,
+-                                          ),
+-                                        ),
+-                                        borderRadius: const BorderRadius.only(
+-                                          topLeft: Radius.circular(5.0),
+-                                          topRight: Radius.circular(5.0),
+-                                        ),
+-                                        color: Colors.white,
++                                    Text(
++                                      vehicle['vehicleNumber'] ?? 'Unknown',
++                                      style: GoogleFonts.poppins(
++                                        fontSize: 16,
++                                        color: ColorUtils.primarycolor(),
++                                        fontWeight: FontWeight.bold,
+                                       ),
+-                                      child: Row(
+-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+-                                        children: [
+-                                          Text(
+-                                            vehicle['vehicleNumber'] ?? 'Unknown',
+-                                            style: GoogleFonts.poppins(
+-                                              fontSize: 16,
+-                                              color: ColorUtils.primarycolor(),
+-                                              fontWeight: FontWeight.bold,
+-                                            ),
+-                                          ),
+-                                          const Spacer(),
+-                                          if (isVendorShortParkingSts(vehicle['sts']?.toString()))
+-                                            Padding(
+-                                              padding: const EdgeInsets.only(bottom: 5.0),
+-                                              child: SizedBox(
+-                                                height: 25,
+-                                                child: Row(
+-                                                  mainAxisSize: MainAxisSize.min,
+-                                                  children: [
+-                                                    Padding(
+-                                                      padding: const EdgeInsets.only(right: 8.0),
+-                                                      child: ElevatedButton(
+-                                                        onPressed: () async {
+-                                                          final String bId = vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? '';
+-                                                          if (bId.isEmpty) {
+-                                                            print('Print: Error - No ID found for vehicle');
+-                                                            return;
+-                                                          }
+-                                                          
+-                                                          print('Print: Button pressed for vehicle: ${vehicle['vehicleNumber']} (ID: $bId)');
+-                                                          String currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(bId);
+-                                                          
+-                                                          await UniversalPrintHelper.printTicket(
+-                                                            context: context,
+-                                                            vendorName: vehicle['vendorName'] ?? vehicle['vendorname'] ?? 'Vendor',
+-                                                            bookingId: bId,
+-                                                            invoiceId: vehicle['invoiceid']?.toString(),
+-                                                            vehicleType: vehicle['vehicleType'] ?? '',
+-                                                            vehicleNumber: vehicle['vehicleNumber'] ?? '',
+-                                                            parkingDate: vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '',
+-                                                            parkingTime: vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
+-                                                            amount: currentAmount,
+-                                                            personName: vehicle['personName'] ?? '',
+-                                                            valetCharge: double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0,
+-                                                            mobileNumber: vehicle['mobileNumber'] ?? '',
+-                                                            vendorId: vehicle['vendorId'] ?? widget.vendorid,
+-                                                            bookType: vehicle['bookType'] ?? '',
+-                                                            sts: vehicle['sts'] ?? '',
+-                                                          );
+-                                                        },
+-                                                        style: ElevatedButton.styleFrom(
+-                                                          backgroundColor: Colors.white,
+-                                                          foregroundColor: ColorUtils.primarycolor(),
+-                                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+-                                                          minimumSize: const Size(0, 0),
+-                                                          shape: RoundedRectangleBorder(
+-                                                            borderRadius: const BorderRadius.all(Radius.circular(5)),
+-                                                            side: BorderSide(
+-                                                              color: ColorUtils.primarycolor(),
+-                                                              width: 0.5,
+-                                                            ),
+-                                                          ),
+-                                                        ),
+-                                                        child: Row(
+-                                                          mainAxisSize: MainAxisSize.min,
+-                                                          children: [
+-                                                            Icon(
+-                                                              Icons.print,
+-                                                              color: ColorUtils.primarycolor(),
+-                                                              size: 14,
+-                                                            ),
+-                                                            const SizedBox(width: 5),
+-                                                            Text(
+-                                                              'Print',
+-                                                              style: GoogleFonts.poppins(
+-                                                                fontSize: 10,
+-                                                                fontWeight: FontWeight.bold,
+-                                                                color: ColorUtils.primarycolor(),
+-                                                               ),
+-                                                            ),
+-                                                          ],
++                                    ),
++                                    const Spacer(),
++                                    if (isVendorShortParkingSts(
++                                      vehicle['sts']?.toString(),
++                                    ))
++                                      Padding(
++                                        padding: const EdgeInsets.only(
++                                          top: 3.0,
++                                          bottom: 5.0,
++                                        ),
++                                        child: SizedBox(
++                                          height: 25,
++                                          child: Row(
++                                            mainAxisSize: MainAxisSize.min,
++                                            children: [
++                                              Padding(
++                                                padding: const EdgeInsets.only(
++                                                  right: 8.0,
++                                                ),
++                                                child: ElevatedButton(
++                                                  onPressed: () async {
++                                                    final String bId =
++                                                        vehicle['_id']
++                                                            ?.toString() ??
++                                                        vehicle['id']
++                                                            ?.toString() ??
++                                                        '';
++                                                    if (bId.isEmpty) {
++                                                      print(
++                                                        'Print: Error - No ID found for vehicle',
++                                                      );
++                                                      return;
++                                                    }
++
++                                                    print(
++                                                      'Print: Button pressed for vehicle: ${vehicle['vehicleNumber']} (ID: $bId)',
++                                                    );
++                                                    String currentAmount =
++                                                        await UniversalPrintHelper.getPrintAmountFromAPI(
++                                                          bId,
++                                                        );
++
++                                                    await UniversalPrintHelper.printTicket(
++                                                      context: context,
++                                                      vendorName:
++                                                          vehicle['vendorName'] ??
++                                                          vehicle['vendorname'] ??
++                                                          'Vendor',
++                                                      bookingId: bId,
++                                                      invoiceId:
++                                                          vehicle['invoiceid']
++                                                              ?.toString(),
++                                                      vehicleType:
++                                                          vehicle['vehicleType'] ??
++                                                          '',
++                                                      vehicleNumber:
++                                                          vehicle['vehicleNumber'] ??
++                                                          '',
++                                                      parkingDate:
++                                                          vehicle['parkedDate'] ??
++                                                          vehicle['parkingDate'] ??
++                                                          '',
++                                                      parkingTime:
++                                                          vehicle['parkedTime'] ??
++                                                          vehicle['parkingTime'] ??
++                                                          '',
++                                                      amount: currentAmount,
++                                                      personName:
++                                                          vehicle['personName'] ??
++                                                          '',
++                                                      valetCharge:
++                                                          double.tryParse(
++                                                            vehicle['valetCharge']
++                                                                    ?.toString() ??
++                                                                '0',
++                                                          ) ??
++                                                          0.0,
++                                                      mobileNumber:
++                                                          vehicle['mobileNumber'] ??
++                                                          '',
++                                                      vendorId:
++                                                          vehicle['vendorId'] ??
++                                                          widget.vendorid,
++                                                      bookType:
++                                                          vehicle['bookType'] ??
++                                                          '',
++                                                      sts: vehicle['sts'] ?? '',
++                                                    );
++                                                  },
++                                                  style: ElevatedButton.styleFrom(
++                                                    backgroundColor:
++                                                        Colors.white,
++                                                    foregroundColor:
++                                                        ColorUtils.primarycolor(),
++                                                    padding:
++                                                        const EdgeInsets.symmetric(
++                                                          horizontal: 10,
++                                                          vertical: 5,
+                                                         ),
+-                                                      ),
++                                                    minimumSize: const Size(
++                                                      0,
++                                                      0,
+                                                     ),
+-                                                    if (_selectedTabIndex == 0 && vehicle['sts']?.toString() == 'Instant')
+-                                                      Padding(
+-                                                        padding: const EdgeInsets.only(right: 8.0),
+-                                                        child: ElevatedButton(
+-                                                          onPressed: (_isExiting[rowBookingId] == true)
+-                                                              ? null
+-                                                              : () => _handlePrintAndExit(vehicle, rowBookingId),
+-                                                          style: ElevatedButton.styleFrom(
+-                                                            backgroundColor: Colors.white,
+-                                                            foregroundColor: ColorUtils.primarycolor(),
+-                                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+-                                                            minimumSize: const Size(0, 0),
+-                                                            shape: RoundedRectangleBorder(
+-                                                              borderRadius: const BorderRadius.all(Radius.circular(5)),
+-                                                              side: BorderSide(
+-                                                                color: ColorUtils.primarycolor(),
+-                                                                width: 0.5,
+-                                                              ),
+-                                                            ),
++                                                    shape: RoundedRectangleBorder(
++                                                      borderRadius:
++                                                          const BorderRadius.all(
++                                                            Radius.circular(5),
+                                                           ),
+-                                                          child: Row(
+-                                                            mainAxisSize: MainAxisSize.min,
+-                                                            children: [
+-                                                              if (_isExiting[rowBookingId] == true)
+-                                                                SizedBox(
+-                                                                  width: 14,
+-                                                                  height: 14,
+-                                                                  child: CircularProgressIndicator(
+-                                                                    strokeWidth: 2,
+-                                                                    valueColor: AlwaysStoppedAnimation<Color>(ColorUtils.primarycolor()),
+-                                                                  ),
+-                                                                )
+-                                                              else
+-                                                                Icon(
+-                                                                  Icons.check_circle_outline,
+-                                                                  color: ColorUtils.primarycolor(),
+-                                                                  size: 14,
+-                                                                ),
+-                                                              const SizedBox(width: 5),
+-                                                              Text(
+-                                                                _isExiting[rowBookingId] == true ? 'Processing...' : 'Print & Exit',
+-                                                                style: GoogleFonts.poppins(
+-                                                                  fontSize: 10,
+-                                                                  fontWeight: FontWeight.bold,
+-                                                                  color: ColorUtils.primarycolor(),
++                                                      side: BorderSide(
++                                                        color:
++                                                            ColorUtils.primarycolor(),
++                                                        width: 0.5,
++                                                      ),
++                                                    ),
++                                                  ),
++                                                  child: Row(
++                                                    mainAxisSize:
++                                                        MainAxisSize.min,
++                                                    children: [
++                                                      Icon(
++                                                        Icons.print,
++                                                        color: Colors.black,
++                                                        size: 14,
++                                                      ),
++                                                      const SizedBox(width: 5),
++                                                      Text(
++                                                        'Print',
++                                                        style: GoogleFonts.poppins(
++                                                          fontSize: 10,
++                                                          fontWeight:
++                                                              FontWeight.bold,
++                                                          color: Colors.black,
++                                                        ),
++                                                      ),
++                                                    ],
++                                                  ),
++                                                ),
++                                              ),
++                                              if (_selectedTabIndex == 0 &&
++                                                  vehicle['sts']?.toString() ==
++                                                      'Instant')
++                                                Padding(
++                                                  padding:
++                                                      const EdgeInsets.only(
++                                                        right: 8.0,
++                                                      ),
++                                                  child: ElevatedButton(
++                                                    onPressed:
++                                                        (_isExiting[rowBookingId] ==
++                                                                true)
++                                                            ? null
++                                                            : () =>
++                                                                _handlePrintAndExit(
++                                                                  vehicle,
++                                                                  rowBookingId,
+                                                                 ),
+-                                                              ),
+-                                                            ],
++                                                    style: ElevatedButton.styleFrom(
++                                                      backgroundColor:
++                                                          Colors.white,
++                                                      foregroundColor:
++                                                          ColorUtils.primarycolor(),
++                                                      padding:
++                                                          const EdgeInsets.symmetric(
++                                                            horizontal: 10,
++                                                            vertical: 5,
+                                                           ),
+-                                                        ),
++                                                      minimumSize: const Size(
++                                                        0,
++                                                        0,
+                                                       ),
+-                                                    if (_selectedTabIndex == 0)
+-                                                      Padding(
+-                                                        padding: const EdgeInsets.only(right: 8.0),
+-                                                        child: ElevatedButton(
+-                                                          onPressed: (_isCheckingExit[rowBookingId] == true || _isExiting[rowBookingId] == true)
+-                                                              ? null
+-                                                              : () => _handleExitButtonPressed(vehicle, rowBookingId),
+-                                                          style: ElevatedButton.styleFrom(
+-                                                            backgroundColor: Colors.white,
+-                                                            foregroundColor: Colors.red,
+-                                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+-                                                            minimumSize: const Size(0, 0),
+-                                                            shape: RoundedRectangleBorder(
+-                                                              borderRadius: const BorderRadius.all(Radius.circular(5)),
+-                                                              side: BorderSide(
+-                                                                color: ColorUtils.primarycolor(),
+-                                                                width: 0.5,
++                                                      shape: RoundedRectangleBorder(
++                                                        borderRadius:
++                                                            const BorderRadius.all(
++                                                              Radius.circular(
++                                                                5,
+                                                               ),
+                                                             ),
+-                                                          ),
+-                                                          child: Row(
+-                                                            mainAxisSize: MainAxisSize.min,
+-                                                            children: [
+-                                                              if (_isCheckingExit[rowBookingId] == true)
+-                                                                SizedBox(
+-                                                                  width: 14,
+-                                                                  height: 14,
+-                                                                  child: CircularProgressIndicator(
+-                                                                    strokeWidth: 2,
+-                                                                    valueColor: AlwaysStoppedAnimation<Color>(ColorUtils.primarycolor()),
+-                                                                  ),
+-                                                                )
+-                                                              else
+-                                                                Icon(
+-                                                                  Icons.qr_code_scanner,
+-                                                                  color: ColorUtils.primarycolor(),
+-                                                                  size: 14,
+-                                                                ),
+-                                                              const SizedBox(width: 5),
+-                                                              Text(
+-                                                                _isCheckingExit[rowBookingId] == true ? 'Checking...' : 'Exit',
+-                                                                style: GoogleFonts.poppins(
+-                                                                  fontSize: 10,
+-                                                                  fontWeight: FontWeight.bold,
+-                                                                  color: ColorUtils.primarycolor(),
+-                                                                ),
+-                                                              ),
+-                                                            ],
+-                                                          ),
++                                                        side: BorderSide(
++                                                          color:
++                                                              ColorUtils.primarycolor(),
++                                                          width: 0.5,
+                                                         ),
+                                                       ),
+-                                                  ],
+-                                                ),
+-                                              ),
+-                                            ),
+-                                          if (isSubscriptionSts(vehicle['sts']?.toString()) ||
+-                                              isSubscriptionSts(vehicle['subsctiptiontype']?.toString()))
+-                                            Padding(
+-                                              padding: const EdgeInsets.only(bottom: 5.0),
+-                                              child: SizedBox(
+-                                                height: 25,
+-                                                child: Row(
+-                                                  mainAxisSize: MainAxisSize.min,
+-                                                  children: [
+-                                                    if (_selectedTabIndex == 0 && !isWeeklyOr15DayPassSts(vehicle['sts']?.toString()))
+-                                                      Padding(
+-                                                        padding: const EdgeInsets.only(right: 8.0),
+-                                                        child: ElevatedButton(
+-                                                          onPressed: () async {
+-                                                            final result = await showModalBottomSheet<bool>(
+-                                                              context: context,
+-                                                              isScrollControlled: true,
+-                                                              backgroundColor: Colors.transparent,
+-                                                              builder: (context) {
+-                                                                return DraggableScrollableSheet(
+-                                                                  expand: false,
+-                                                                  builder: (context, scrollController) {
+-                                                                    return Container(
+-                                                                      decoration: const BoxDecoration(
+-                                                                        color: Colors.white,
+-                                                                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+-                                                                      ),
+-                                                                      child: RenewParkingSheet(
+-                                                                        daysleft: remainingDaysMessage,
+-                                                                        navi: "",
+-                                                                        onRefresh: () => fetchVendors(),
+-                                                                        userid: vehicle['userid'] ?? vehicle['userId'] ?? '',
+-                                                                        otp: vehicle['otp'] ?? '',
+-                                                                        vehicletype: vehicle['vehicleType'] ?? '',
+-                                                                        bookingid: vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? '',
+-                                                                        parkingdate: vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '',
+-                                                                        vehiclenumber: vehicle['vehicleNumber'] ?? '',
+-                                                                        username: vehicle['personName'] ?? '',
+-                                                                        phoneno: vehicle['mobileNumber'] ?? '',
+-                                                                        parkingtime: vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
+-                                                                        bookingtypetemporary: vehicle['status'] ?? '',
+-                                                                        sts: vehicle['sts'] ?? '',
+-                                                                        cartype: vehicle['carType'] ?? '',
+-                                                                        vendorid: vehicle['vendorId'] ?? widget.vendorid,
+-                                                                        parkeddate: vehicle['parkedDate'] ?? '',
+-                                                                        parkedtime: vehicle['parkedTime'] ?? '',
+-                                                                        status: vehicle['status'] ?? '',
+-                                                                        totalamount: vehicle['totalamout'] ?? '0',
+-                                                                        newEndDate: null,
+-                                                                        gstfee: "0",
+-                                                                        handlingfee: "0",
+-                                                                        amout: vehicle['amount'] ?? '0',
+-                                                                        payableduration: "0",
+-                                                                        venodorname: vehicle['vendorName'] ?? vehicle['vendorname'] ?? 'Vendor',
+-                                                                        subscriptionEndDate: vehicle['subsctiptionenddate'] ?? '',
+-                                                                      ),
+-                                                                    );
+-                                                                  },
+-                                                                );
+-                                                              },
+-                                                            );
+-                                                            if (result == true) {
+-                                                              fetchVendors();
+-                                                            }
+-                                                          },
+-                                                          style: ElevatedButton.styleFrom(
+-                                                            backgroundColor: Colors.white,
+-                                                            foregroundColor: ColorUtils.primarycolor(),
+-                                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+-                                                            minimumSize: const Size(0, 0),
+-                                                            shape: RoundedRectangleBorder(
+-                                                              borderRadius: const BorderRadius.all(Radius.circular(5)),
+-                                                              side: BorderSide(color: ColorUtils.primarycolor(), width: 0.5),
++                                                    ),
++                                                    child: Row(
++                                                      mainAxisSize:
++                                                          MainAxisSize.min,
++                                                      children: [
++                                                        if (_isExiting[rowBookingId] ==
++                                                            true)
++                                                          SizedBox(
++                                                            width: 14,
++                                                            height: 14,
++                                                            child: CircularProgressIndicator(
++                                                              strokeWidth: 2,
++                                                              valueColor:
++                                                                  AlwaysStoppedAnimation<
++                                                                    Color
++                                                                  >(
++                                                                    ColorUtils.primarycolor(),
++                                                                  ),
+                                                             ),
++                                                          )
++                                                        else
++                                                          Icon(
++                                                            Icons
++                                                                .check_circle_outline,
++                                                            color: Colors.black,
++                                                            size: 14,
+                                                           ),
+-                                                          child: Row(
+-                                                            mainAxisSize: MainAxisSize.min,
+-                                                            children: [
+-                                                              Icon(Icons.refresh, color: ColorUtils.primarycolor(), size: 14),
+-                                                              const SizedBox(width: 5),
+-                                                              Text(
+-                                                                'Renew',
+-                                                                style: GoogleFonts.poppins(
+-                                                                  fontSize: 10,
+-                                                                  fontWeight: FontWeight.bold,
+-                                                                  color: ColorUtils.primarycolor(),
+-                                                                ),
+-                                                              ),
+-                                                            ],
++                                                        const SizedBox(
++                                                          width: 5,
++                                                        ),
++                                                        Text(
++                                                          _isExiting[rowBookingId] ==
++                                                                  true
++                                                              ? 'Processing...'
++                                                              : 'Print & Exit',
++                                                          style: GoogleFonts.poppins(
++                                                            fontSize: 10,
++                                                            fontWeight:
++                                                                FontWeight.bold,
++                                                            color:
++                                                                ColorUtils.primarycolor(),
+                                                           ),
+                                                         ),
++                                                      ],
++                                                    ),
++                                                  ),
++                                                ),
++                                              if (_selectedTabIndex == 0)
++                                                Padding(
++                                                  padding:
++                                                      const EdgeInsets.only(
++                                                        right: 8.0,
+                                                       ),
+-                                                    Padding(
+-                                                      padding: const EdgeInsets.only(right: 8.0),
+-                                                      child: ElevatedButton(
+-                                                          onPressed: () async {
+-                                                            final String bId = vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? '';
+-                                                            if (bId.isEmpty) {
+-                                                              print('Sub Print: Error - No ID found');
+-                                                              return;
+-                                                            }
+-                                                            print('Sub Print: Button pressed for ${vehicle['vehicleNumber']} (ID: $bId)');
+-                                                            String currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(bId);
+-                                                            await UniversalPrintHelper.printTicket(
+-                                                              context: context,
+-                                                              vendorName: vehicle['vendorName'] ?? vehicle['vendorname'] ?? 'Vendor',
+-                                                              bookingId: bId,
+-                                                              invoiceId: vehicle['invoiceid']?.toString(),
+-                                                              vehicleType: vehicle['vehicleType'] ?? '',
+-                                                              vehicleNumber: vehicle['vehicleNumber'] ?? '',
+-                                                              parkingDate: vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '',
+-                                                              parkingTime: vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
+-                                                              amount: currentAmount,
+-                                                              personName: vehicle['personName'] ?? '',
+-                                                              valetCharge: double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0,
+-                                                              mobileNumber: vehicle['mobileNumber'] ?? '',
+-                                                              vendorId: vehicle['vendorId'] ?? widget.vendorid,
+-                                                              bookType: vehicle['bookType'] ?? '',
+-                                                              sts: vehicle['sts'] ?? '',
+-                                                            );
+-                                                          },
+-                                                        style: ElevatedButton.styleFrom(
+-                                                          backgroundColor: Colors.white,
+-                                                          foregroundColor: ColorUtils.primarycolor(),
+-                                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+-                                                          minimumSize: const Size(0, 0),
+-                                                          shape: RoundedRectangleBorder(
+-                                                            borderRadius: const BorderRadius.all(Radius.circular(5)),
+-                                                            side: BorderSide(
+-                                                              color: ColorUtils.primarycolor(),
+-                                                              width: 0.5,
+-                                                            ),
++                                                  child: ElevatedButton(
++                                                    onPressed:
++                                                        (_isCheckingExit[rowBookingId] ==
++                                                                    true ||
++                                                                _isExiting[rowBookingId] ==
++                                                                    true)
++                                                            ? null
++                                                            : () =>
++                                                                _handleExitButtonPressed(
++                                                                  vehicle,
++                                                                  rowBookingId,
++                                                                ),
++                                                    style: ElevatedButton.styleFrom(
++                                                      backgroundColor:
++                                                          Colors.white,
++                                                      foregroundColor:
++                                                          Colors.red,
++                                                      padding:
++                                                          const EdgeInsets.symmetric(
++                                                            horizontal: 10,
++                                                            vertical: 5,
+                                                           ),
+-                                                        ),
+-                                                        child: Row(
+-                                                          mainAxisSize: MainAxisSize.min,
+-                                                          children: [
+-                                                            Icon(
+-                                                              Icons.print,
+-                                                              color: ColorUtils.primarycolor(),
+-                                                              size: 14,
+-                                                            ),
+-                                                            const SizedBox(width: 5),
+-                                                            Text(
+-                                                              'Print',
+-                                                              style: GoogleFonts.poppins(
+-                                                                fontSize: 10,
+-                                                                fontWeight: FontWeight.bold,
+-                                                                color: ColorUtils.primarycolor(),
++                                                      minimumSize: const Size(
++                                                        0,
++                                                        0,
++                                                      ),
++                                                      shape: RoundedRectangleBorder(
++                                                        borderRadius:
++                                                            const BorderRadius.all(
++                                                              Radius.circular(
++                                                                5,
+                                                               ),
+                                                             ),
+-                                                          ],
++                                                        side: BorderSide(
++                                                          color:
++                                                              ColorUtils.primarycolor(),
++                                                          width: 0.5,
+                                                         ),
+                                                       ),
+                                                     ),
+-                                                    if (_selectedTabIndex == 0)
+-                                                      Padding(
+-                                                        padding: const EdgeInsets.only(right: 8.0),
+-                                                        child: ElevatedButton(
+-                                                          onPressed: () {
+-                                                            showModalBottomSheet(
+-                                                              context: context,
+-                                                              isScrollControlled: true,
+-                                                              backgroundColor: Colors.transparent,
+-                                                              builder: (context) {
+-                                                                return DraggableScrollableSheet(
+-                                                                  expand: false,
+-                                                                  builder: (context, scrollController) {
+-                                                                    return Container(
+-                                                                      decoration: const BoxDecoration(
+-                                                                        color: Colors.white,
+-                                                                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+-                                                                      ),
+-                                                                      child: subexit(
+-                                                                        userid: vehicle['userid'] ?? vehicle['userId'] ?? '',
+-                                                                        otp: vehicle['otp'] ?? '',
+-                                                                        vehicletype: vehicle['vehicleType'] ?? '',
+-                                                                        bookingid: vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? '',
+-                                                                        invoiceid: vehicle['invoiceid']?.toString() ?? vehicle['invoiceId']?.toString() ?? '',
+-                                                                        parkingdate: vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '',
+-                                                                        vehiclenumber: vehicle['vehicleNumber'] ?? '',
+-                                                                        username: vehicle['personName'] ?? '',
+-                                                                        phoneno: vehicle['mobileNumber'] ?? '',
+-                                                                        parkingtime: vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
+-                                                                        bookingtypetemporary: vehicle['status'] ?? '',
+-                                                                        sts: vehicle['sts'] ?? '',
+-                                                                        cartype: vehicle['carType'] ?? '',
+-                                                                        vendorid: vehicle['vendorId'] ?? widget.vendorid,
+-                                                                        parkeddate: vehicle['parkedDate'] ?? '',
+-                                                                        parkedtime: vehicle['parkedTime'] ?? '',
+-                                                                        status: vehicle['status'] ?? '',
+-                                                                      ),
+-                                                                    );
+-                                                                  },
+-                                                                );
+-                                                              },
+-                                                            );
+-                                                          },
+-                                                          style: ElevatedButton.styleFrom(
+-                                                            backgroundColor: Colors.white,
+-                                                            foregroundColor: Colors.red,
+-                                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+-                                                            minimumSize: const Size(0, 0),
+-                                                            shape: RoundedRectangleBorder(
+-                                                              borderRadius: const BorderRadius.all(Radius.circular(5)),
+-                                                              side: BorderSide(
+-                                                                color: ColorUtils.primarycolor(),
+-                                                                width: 0.5,
+-                                                              ),
++                                                    child: Row(
++                                                      mainAxisSize:
++                                                          MainAxisSize.min,
++                                                      children: [
++                                                        if (_isCheckingExit[rowBookingId] ==
++                                                            true)
++                                                          SizedBox(
++                                                            width: 14,
++                                                            height: 14,
++                                                            child: CircularProgressIndicator(
++                                                              strokeWidth: 2,
++                                                              valueColor:
++                                                                  AlwaysStoppedAnimation<
++                                                                    Color
++                                                                  >(
++                                                                    ColorUtils.primarycolor(),
++                                                                  ),
+                                                             ),
++                                                          )
++                                                        else
++                                                          Icon(
++                                                            Icons
++                                                                .qr_code_scanner,
++                                                            color: Colors.black,
++                                                            size: 14,
+                                                           ),
+-                                                          child: Row(
+-                                                            mainAxisSize: MainAxisSize.min,
+-                                                            children: [
+-                                                              Icon(
+-                                                                Icons.qr_code_scanner,
+-                                                                color: ColorUtils.primarycolor(),
+-                                                                size: 14,
+-                                                              ),
+-                                                              const SizedBox(width: 5),
+-                                                              Text(
+-                                                                'Exit',
+-                                                                style: GoogleFonts.poppins(
+-                                                                  fontSize: 10,
+-                                                                  fontWeight: FontWeight.bold,
+-                                                                  color: ColorUtils.primarycolor(),
+-                                                                ),
+-                                                              ),
+-                                                            ],
++                                                        const SizedBox(
++                                                          width: 5,
++                                                        ),
++                                                        Text(
++                                                          _isCheckingExit[rowBookingId] ==
++                                                                  true
++                                                              ? 'Checking...'
++                                                              : 'Exit',
++                                                          style: GoogleFonts.poppins(
++                                                            fontSize: 10,
++                                                            fontWeight:
++                                                                FontWeight.bold,
++                                                            color:
++                                                                ColorUtils.primarycolor(),
+                                                           ),
+                                                         ),
+-                                                      ),
+-                                                  ],
++                                                      ],
++                                                    ),
++                                                  ),
+                                                 ),
+-                                              ),
+-                                            ),
+-                                        ],
+-                                      ),
+-                                    ),
+-                                    const SizedBox(height: 0),
+-                                    Row(
+-                                      crossAxisAlignment: CrossAxisAlignment.center,
+-                                      children: [
+-                                        Container(
+-                                          padding: const EdgeInsets.only(
+-                                              left: 12.0, right: 15.0, top: 6.0, bottom: 6.0),
+-                                          decoration: BoxDecoration(
+-                                            color: vehicle['status'].toString().toLowerCase() == 'cancelled'
+-                                                ? Colors.red
+-                                                : ColorUtils.primarycolor(),
+-                                            borderRadius: const BorderRadius.only(
+-                                              topRight: Radius.circular(20.0),
+-                                              bottomRight: Radius.circular(20.0),
+-                                            ),
+-                                          ),
+-                                          child: Icon(
+-                                            _getVehicleIcon(vehicle['vehicleType']),
+-                                            size: 20,
+-                                            color: Colors.white,
++                                            ],
+                                           ),
+                                         ),
+-                                        const SizedBox(width: 10),
+-                                        Expanded(
+-                                          child: Column(
+-                                            crossAxisAlignment: CrossAxisAlignment.start,
++                                      ),
++                                    if (isSubscriptionSts(
++                                          vehicle['sts']?.toString(),
++                                        ) ||
++                                        isSubscriptionSts(
++                                          vehicle['subsctiptiontype']
++                                              ?.toString(),
++                                        ))
++                                      Padding(
++                                        padding: const EdgeInsets.only(
++                                          top: 3.0,
++                                          bottom: 5.0,
++                                        ),
++                                        child: SizedBox(
++                                          height: 25,
++                                          child: Row(
++                                            mainAxisSize: MainAxisSize.min,
+                                             children: [
+-                                              Row(
+-                                                children: [
+-                                                  const SizedBox(height: 10),
+-                                                  Padding(
+-                                                    padding: const EdgeInsets.only(top: 8.0),
++                                              if (_selectedTabIndex == 0 &&
++                                                  !isWeeklyOr15DayPassSts(
++                                                    vehicle['sts']?.toString(),
++                                                  ))
++                                                Padding(
++                                                  padding:
++                                                      const EdgeInsets.only(
++                                                        right: 8.0,
++                                                      ),
++                                                  child: ElevatedButton(
++                                                    onPressed: () async {
++                                                      final result = await showModalBottomSheet<
++                                                        bool
++                                                      >(
++                                                        context: context,
++                                                        isScrollControlled:
++                                                            true,
++                                                        backgroundColor:
++                                                            Colors.transparent,
++                                                        builder: (context) {
++                                                          return DraggableScrollableSheet(
++                                                            expand: false,
++                                                            builder: (
++                                                              context,
++                                                              scrollController,
++                                                            ) {
++                                                              return Container(
++                                                                decoration: const BoxDecoration(
++                                                                  color:
++                                                                      Colors
++                                                                          .white,
++                                                                  borderRadius:
++                                                                      BorderRadius.vertical(
++                                                                        top: Radius.circular(
++                                                                          20,
++                                                                        ),
++                                                                      ),
++                                                                ),
++                                                                child: RenewParkingSheet(
++                                                                  daysleft:
++                                                                      remainingDaysMessage,
++                                                                  navi: "",
++                                                                  onRefresh:
++                                                                      () =>
++                                                                          fetchVendors(),
++                                                                  userid:
++                                                                      vehicle['userid'] ??
++                                                                      vehicle['userId'] ??
++                                                                      '',
++                                                                  otp:
++                                                                      vehicle['otp'] ??
++                                                                      '',
++                                                                  vehicletype:
++                                                                      vehicle['vehicleType'] ??
++                                                                      '',
++                                                                  bookingid:
++                                                                      vehicle['_id']
++                                                                          ?.toString() ??
++                                                                      vehicle['id']
++                                                                          ?.toString() ??
++                                                                      '',
++                                                                  parkingdate:
++                                                                      vehicle['parkedDate'] ??
++                                                                      vehicle['parkingDate'] ??
++                                                                      '',
++                                                                  vehiclenumber:
++                                                                      vehicle['vehicleNumber'] ??
++                                                                      '',
++                                                                  username:
++                                                                      vehicle['personName'] ??
++                                                                      '',
++                                                                  phoneno:
++                                                                      vehicle['mobileNumber'] ??
++                                                                      '',
++                                                                  parkingtime:
++                                                                      vehicle['parkedTime'] ??
++                                                                      vehicle['parkingTime'] ??
++                                                                      '',
++                                                                  bookingtypetemporary:
++                                                                      vehicle['status'] ??
++                                                                      '',
++                                                                  sts:
++                                                                      vehicle['sts'] ??
++                                                                      '',
++                                                                  cartype:
++                                                                      vehicle['carType'] ??
++                                                                      '',
++                                                                  vendorid:
++                                                                      vehicle['vendorId'] ??
++                                                                      widget
++                                                                          .vendorid,
++                                                                  parkeddate:
++                                                                      vehicle['parkedDate'] ??
++                                                                      '',
++                                                                  parkedtime:
++                                                                      vehicle['parkedTime'] ??
++                                                                      '',
++                                                                  status:
++                                                                      vehicle['status'] ??
++                                                                      '',
++                                                                  totalamount:
++                                                                      vehicle['totalamout'] ??
++                                                                      '0',
++                                                                  newEndDate:
++                                                                      null,
++                                                                  gstfee: "0",
++                                                                  handlingfee:
++                                                                      "0",
++                                                                  amout:
++                                                                      vehicle['amount'] ??
++                                                                      '0',
++                                                                  payableduration:
++                                                                      "0",
++                                                                  venodorname:
++                                                                      vehicle['vendorName'] ??
++                                                                      vehicle['vendorname'] ??
++                                                                      'Vendor',
++                                                                  subscriptionEndDate:
++                                                                      vehicle['subsctiptionenddate'] ??
++                                                                      '',
++                                                                ),
++                                                              );
++                                                            },
++                                                          );
++                                                        },
++                                                      );
++                                                      if (result == true) {
++                                                        fetchVendors();
++                                                      }
++                                                    },
++                                                    style: ElevatedButton.styleFrom(
++                                                      backgroundColor:
++                                                          Colors.white,
++                                                      foregroundColor:
++                                                          ColorUtils.primarycolor(),
++                                                      padding:
++                                                          const EdgeInsets.symmetric(
++                                                            horizontal: 10,
++                                                            vertical: 5,
++                                                          ),
++                                                      minimumSize: const Size(
++                                                        0,
++                                                        0,
++                                                      ),
++                                                      shape: RoundedRectangleBorder(
++                                                        borderRadius:
++                                                            const BorderRadius.all(
++                                                              Radius.circular(
++                                                                5,
++                                                              ),
++                                                            ),
++                                                        side: BorderSide(
++                                                          color:
++                                                              ColorUtils.primarycolor(),
++                                                          width: 0.5,
++                                                        ),
++                                                      ),
++                                                    ),
+                                                     child: Row(
++                                                      mainAxisSize:
++                                                          MainAxisSize.min,
+                                                       children: [
+-                                                        Text(
+-                                                          'Parking Schedule: ',
+-                                                          style: GoogleFonts.poppins(
+-                                                            fontSize: 12,
+-                                                            fontWeight: FontWeight.bold,
+-                                                          ),
++                                                        Icon(
++                                                          Icons.refresh,
++                                                          color: Colors.black,
++                                                          size: 14,
+                                                         ),
+-                                                        Text(
+-                                                          ' ${vehicle['parkingDate'] ?? 'N/A'}',
+-                                                          style: GoogleFonts.poppins(fontSize: 12),
++                                                        const SizedBox(
++                                                          width: 5,
+                                                         ),
+-                                                        const SizedBox(width: 5),
+                                                         Text(
+-                                                          vehicle['parkingTime'] ?? 'N/A',
+-                                                          style: GoogleFonts.poppins(fontSize: 12),
++                                                          'Renew',
++                                                          style: GoogleFonts.poppins(
++                                                            fontSize: 10,
++                                                            fontWeight:
++                                                                FontWeight.bold,
++                                                            color:
++                                                                ColorUtils.primarycolor(),
++                                                          ),
+                                                         ),
+                                                       ],
+                                                     ),
+                                                   ),
+-                                                ],
+-                                              ),
+-                                              if (_selectedTabIndex == 1 && (vehicle['exitvehicledate'] ?? '').isNotEmpty)
+-                                                Padding(
+-                                                  padding: const EdgeInsets.only(top: 4.0),
++                                                ),
++                                              Padding(
++                                                padding: const EdgeInsets.only(
++                                                  right: 8.0,
++                                                ),
++                                                child: ElevatedButton(
++                                                  onPressed: () async {
++                                                    final String bId =
++                                                        vehicle['_id']
++                                                            ?.toString() ??
++                                                        vehicle['id']
++                                                            ?.toString() ??
++                                                        '';
++                                                    if (bId.isEmpty) {
++                                                      print(
++                                                        'Sub Print: Error - No ID found',
++                                                      );
++                                                      return;
++                                                    }
++                                                    print(
++                                                      'Sub Print: Button pressed for ${vehicle['vehicleNumber']} (ID: $bId)',
++                                                    );
++                                                    String currentAmount =
++                                                        await UniversalPrintHelper.getPrintAmountFromAPI(
++                                                          bId,
++                                                        );
++                                                    await UniversalPrintHelper.printTicket(
++                                                      context: context,
++                                                      vendorName:
++                                                          vehicle['vendorName'] ??
++                                                          vehicle['vendorname'] ??
++                                                          'Vendor',
++                                                      bookingId: bId,
++                                                      invoiceId:
++                                                          vehicle['invoiceid']
++                                                              ?.toString(),
++                                                      vehicleType:
++                                                          vehicle['vehicleType'] ??
++                                                          '',
++                                                      vehicleNumber:
++                                                          vehicle['vehicleNumber'] ??
++                                                          '',
++                                                      parkingDate:
++                                                          vehicle['parkedDate'] ??
++                                                          vehicle['parkingDate'] ??
++                                                          '',
++                                                      parkingTime:
++                                                          vehicle['parkedTime'] ??
++                                                          vehicle['parkingTime'] ??
++                                                          '',
++                                                      amount: currentAmount,
++                                                      personName:
++                                                          vehicle['personName'] ??
++                                                          '',
++                                                      valetCharge:
++                                                          double.tryParse(
++                                                            vehicle['valetCharge']
++                                                                    ?.toString() ??
++                                                                '0',
++                                                          ) ??
++                                                          0.0,
++                                                      mobileNumber:
++                                                          vehicle['mobileNumber'] ??
++                                                          '',
++                                                      vendorId:
++                                                          vehicle['vendorId'] ??
++                                                          widget.vendorid,
++                                                      bookType:
++                                                          vehicle['bookType'] ??
++                                                          '',
++                                                      sts: vehicle['sts'] ?? '',
++                                                    );
++                                                  },
++                                                  style: ElevatedButton.styleFrom(
++                                                    backgroundColor:
++                                                        Colors.white,
++                                                    foregroundColor:
++                                                        ColorUtils.primarycolor(),
++                                                    padding:
++                                                        const EdgeInsets.symmetric(
++                                                          horizontal: 10,
++                                                          vertical: 5,
++                                                        ),
++                                                    minimumSize: const Size(
++                                                      0,
++                                                      0,
++                                                    ),
++                                                    shape: RoundedRectangleBorder(
++                                                      borderRadius:
++                                                          const BorderRadius.all(
++                                                            Radius.circular(5),
++                                                          ),
++                                                      side: BorderSide(
++                                                        color:
++                                                            ColorUtils.primarycolor(),
++                                                        width: 0.5,
++                                                      ),
++                                                    ),
++                                                  ),
+                                                   child: Row(
++                                                    mainAxisSize:
++                                                        MainAxisSize.min,
+                                                     children: [
++                                                      Icon(
++                                                        Icons.print,
++                                                        color: Colors.black,
++                                                        size: 14,
++                                                      ),
++                                                      const SizedBox(width: 5),
+                                                       Text(
+-                                                        'Exit: ',
++                                                        'Print',
+                                                         style: GoogleFonts.poppins(
+-                                                          fontSize: 12,
+-                                                          fontWeight: FontWeight.bold,
++                                                          fontSize: 10,
++                                                          fontWeight:
++                                                              FontWeight.bold,
++                                                          color: Colors.black,
+                                                         ),
+                                                       ),
+-                                                      Text(
+-                                                        '${vehicle['exitvehicledate']} ${vehicle['exitvehicletime'] ?? ''}',
+-                                                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.red),
+-                                                      ),
+                                                     ],
+                                                   ),
+                                                 ),
+-                                              if (!isSubscriptionSts(vehicle['sts']?.toString()) && 
+-                                               !isSubscriptionSts(vehicle['subsctiptiontype']?.toString()))
+-                                                Row(
+-                                                  children: [
+-                                                    Text(
+-                                                      'Payable Time: ',
+-                                                      style: GoogleFonts.poppins(
+-                                                        fontSize: 14,
+-                                                        fontWeight: FontWeight.bold,
++                                              ),
++                                              if (_selectedTabIndex == 0)
++                                                Padding(
++                                                  padding:
++                                                      const EdgeInsets.only(
++                                                        right: 8.0,
+                                                       ),
+-                                                    ),
+-                                                    Text(
+-                                                      formattedPayableDuration,
+-                                                      style: GoogleFonts.poppins(fontSize: 14),
+-                                                    ),
+-                                                  ],
+-                                                ),
+-                                              if (isSubscriptionSts(vehicle['sts']?.toString()) || 
+-                                                  isSubscriptionSts(vehicle['subsctiptiontype']?.toString()))
+-                                                Row(
+-                                                  children: [
+-                                                    Text(
+-                                                      'Remaining: ',
+-                                                      style: GoogleFonts.poppins(
+-                                                        fontSize: 14,
+-                                                        fontWeight: FontWeight.bold,
++                                                  child: ElevatedButton(
++                                                    onPressed: () {
++                                                      showModalBottomSheet(
++                                                        context: context,
++                                                        isScrollControlled:
++                                                            true,
++                                                        backgroundColor:
++                                                            Colors.transparent,
++                                                        builder: (context) {
++                                                          return DraggableScrollableSheet(
++                                                            expand: false,
++                                                            builder: (
++                                                              context,
++                                                              scrollController,
++                                                            ) {
++                                                              return Container(
++                                                                decoration: const BoxDecoration(
++                                                                  color:
++                                                                      Colors
++                                                                          .white,
++                                                                  borderRadius:
++                                                                      BorderRadius.vertical(
++                                                                        top: Radius.circular(
++                                                                          20,
++                                                                        ),
++                                                                      ),
++                                                                ),
++                                                                child: subexit(
++                                                                  userid:
++                                                                      vehicle['userid'] ??
++                                                                      vehicle['userId'] ??
++                                                                      '',
++                                                                  otp:
++                                                                      vehicle['otp'] ??
++                                                                      '',
++                                                                  vehicletype:
++                                                                      vehicle['vehicleType'] ??
++                                                                      '',
++                                                                  bookingid:
++                                                                      vehicle['_id']
++                                                                          ?.toString() ??
++                                                                      vehicle['id']
++                                                                          ?.toString() ??
++                                                                      '',
++                                                                  invoiceid:
++                                                                      vehicle['invoiceid']
++                                                                          ?.toString() ??
++                                                                      vehicle['invoiceId']
++                                                                          ?.toString() ??
++                                                                      '',
++                                                                  parkingdate:
++                                                                      vehicle['parkedDate'] ??
++                                                                      vehicle['parkingDate'] ??
++                                                                      '',
++                                                                  vehiclenumber:
++                                                                      vehicle['vehicleNumber'] ??
++                                                                      '',
++                                                                  username:
++                                                                      vehicle['personName'] ??
++                                                                      '',
++                                                                  phoneno:
++                                                                      vehicle['mobileNumber'] ??
++                                                                      '',
++                                                                  parkingtime:
++                                                                      vehicle['parkedTime'] ??
++                                                                      vehicle['parkingTime'] ??
++                                                                      '',
++                                                                  bookingtypetemporary:
++                                                                      vehicle['status'] ??
++                                                                      '',
++                                                                  sts:
++                                                                      vehicle['sts'] ??
++                                                                      '',
++                                                                  cartype:
++                                                                      vehicle['carType'] ??
++                                                                      '',
++                                                                  vendorid:
++                                                                      vehicle['vendorId'] ??
++                                                                      widget
++                                                                          .vendorid,
++                                                                  parkeddate:
++                                                                      vehicle['parkedDate'] ??
++                                                                      '',
++                                                                  parkedtime:
++                                                                      vehicle['parkedTime'] ??
++                                                                      '',
++                                                                  status:
++                                                                      vehicle['status'] ??
++                                                                      '',
++                                                                ),
++                                                              );
++                                                            },
++                                                          );
++                                                        },
++                                                      );
++                                                    },
++                                                    style: ElevatedButton.styleFrom(
++                                                      backgroundColor:
++                                                          Colors.white,
++                                                      foregroundColor:
++                                                          Colors.red,
++                                                      padding:
++                                                          const EdgeInsets.symmetric(
++                                                            horizontal: 10,
++                                                            vertical: 5,
++                                                          ),
++                                                      minimumSize: const Size(
++                                                        0,
++                                                        0,
+                                                       ),
+-                                                    ),
+-                                                    Text(
+-                                                      remainingDaysMessage,
+-                                                      style: GoogleFonts.poppins(
+-                                                        fontSize: 14,
+-                                                        color: ColorUtils.primarycolor(),
++                                                      shape: RoundedRectangleBorder(
++                                                        borderRadius:
++                                                            const BorderRadius.all(
++                                                              Radius.circular(
++                                                                5,
++                                                              ),
++                                                            ),
++                                                        side: BorderSide(
++                                                          color:
++                                                              ColorUtils.primarycolor(),
++                                                          width: 0.5,
++                                                        ),
+                                                       ),
+                                                     ),
+-                                                  ],
++                                                    child: Row(
++                                                      mainAxisSize:
++                                                          MainAxisSize.min,
++                                                      children: [
++                                                        Icon(
++                                                          Icons.qr_code_scanner,
++                                                          color: Colors.black,
++                                                          size: 14,
++                                                        ),
++                                                        const SizedBox(
++                                                          width: 5,
++                                                        ),
++                                                        Text(
++                                                          'Exit',
++                                                          style: GoogleFonts.poppins(
++                                                            fontSize: 10,
++                                                            fontWeight:
++                                                                FontWeight.bold,
++                                                            color:
++                                                                ColorUtils.primarycolor(),
++                                                          ),
++                                                        ),
++                                                      ],
++                                                    ),
++                                                  ),
+                                                 ),
+-                                              Row(
+-                                                mainAxisAlignment: MainAxisAlignment.start,
++                                            ],
++                                          ),
++                                        ),
++                                      ),
++                                  ],
++                                ),
++                              ),
++                              const SizedBox(height: 0),
++                              Row(
++                                crossAxisAlignment: CrossAxisAlignment.center,
++                                children: [
++                                  Container(
++                                    padding: const EdgeInsets.only(
++                                      left: 12.0,
++                                      right: 15.0,
++                                      top: 6.0,
++                                      bottom: 6.0,
++                                    ),
++                                    decoration: BoxDecoration(
++                                      color:
++                                          vehicle['status']
++                                                      .toString()
++                                                      .toLowerCase() ==
++                                                  'cancelled'
++                                              ? Colors.red
++                                              : ColorUtils.primarycolor(),
++                                      borderRadius: const BorderRadius.only(
++                                        topRight: Radius.circular(20.0),
++                                        bottomRight: Radius.circular(20.0),
++                                      ),
++                                    ),
++                                    child: Icon(
++                                      _getVehicleIcon(vehicle['vehicleType']),
++                                      size: 20,
++                                      color: Colors.white,
++                                    ),
++                                  ),
++                                  const SizedBox(width: 10),
++                                  Expanded(
++                                    child: Column(
++                                      crossAxisAlignment:
++                                          CrossAxisAlignment.start,
++                                      children: [
++                                        Row(
++                                          children: [
++                                            const SizedBox(height: 10),
++                                            Padding(
++                                              padding: const EdgeInsets.only(
++                                                top: 8.0,
++                                              ),
++                                              child: Row(
+                                                 children: [
+-                                                  Container(height: 10),
+-                                                  if (vehicle['status'].toString().toLowerCase() == 'parked')
+-                                                    Container(
+-                                                      alignment: Alignment.topCenter,
++                                                  Text(
++                                                    'Parking Schedule: ',
++                                                    style: GoogleFonts.poppins(
++                                                      fontSize: 12,
++                                                      fontWeight:
++                                                          FontWeight.bold,
+                                                     ),
+-                                                  const Spacer(),
++                                                  ),
++                                                  Text(
++                                                    ' ${vehicle['parkingDate'] ?? 'N/A'}',
++                                                    style: GoogleFonts.poppins(
++                                                      fontSize: 12,
++                                                    ),
++                                                  ),
++                                                  const SizedBox(width: 5),
++                                                  Text(
++                                                    vehicle['parkingTime'] ??
++                                                        'N/A',
++                                                    style: GoogleFonts.poppins(
++                                                      fontSize: 12,
++                                                    ),
++                                                  ),
+                                                 ],
+                                               ),
++                                            ),
++                                          ],
++                                        ),
++                                        if (_selectedTabIndex == 1 &&
++                                            (vehicle['exitvehicledate'] ?? '')
++                                                .isNotEmpty)
++                                          Padding(
++                                            padding: const EdgeInsets.only(
++                                              top: 4.0,
++                                            ),
++                                            child: Row(
++                                              children: [
++                                                Text(
++                                                  'Exit: ',
++                                                  style: GoogleFonts.poppins(
++                                                    fontSize: 12,
++                                                    fontWeight: FontWeight.bold,
++                                                  ),
++                                                ),
++                                                Text(
++                                                  '${vehicle['exitvehicledate']} ${vehicle['exitvehicletime'] ?? ''}',
++                                                  style: GoogleFonts.poppins(
++                                                    fontSize: 12,
++                                                    color: Colors.red,
++                                                  ),
++                                                ),
++                                              ],
++                                            ),
++                                          ),
++                                        if (!isSubscriptionSts(
++                                              vehicle['sts']?.toString(),
++                                            ) &&
++                                            !isSubscriptionSts(
++                                              vehicle['subsctiptiontype']
++                                                  ?.toString(),
++                                            ))
++                                          Row(
++                                            children: [
++                                              Text(
++                                                'Payable Time: ',
++                                                style: GoogleFonts.poppins(
++                                                  fontSize: 14,
++                                                  fontWeight: FontWeight.bold,
++                                                ),
++                                              ),
++                                              Text(
++                                                formattedPayableDuration,
++                                                style: GoogleFonts.poppins(
++                                                  fontSize: 14,
++                                                ),
++                                              ),
+                                             ],
+                                           ),
++                                        if (isSubscriptionSts(
++                                              vehicle['sts']?.toString(),
++                                            ) ||
++                                            isSubscriptionSts(
++                                              vehicle['subsctiptiontype']
++                                                  ?.toString(),
++                                            ))
++                                          Row(
++                                            children: [
++                                              Text(
++                                                'Remaining: ',
++                                                style: GoogleFonts.poppins(
++                                                  fontSize: 14,
++                                                  fontWeight: FontWeight.bold,
++                                                ),
++                                              ),
++                                              Text(
++                                                remainingDaysMessage,
++                                                style: GoogleFonts.poppins(
++                                                  fontSize: 14,
++                                                  color:
++                                                      ColorUtils.primarycolor(),
++                                                ),
++                                              ),
++                                            ],
++                                          ),
++                                        Row(
++                                          mainAxisAlignment:
++                                              MainAxisAlignment.start,
++                                          children: [
++                                            Container(height: 10),
++                                            if (vehicle['status']
++                                                    .toString()
++                                                    .toLowerCase() ==
++                                                'parked')
++                                              Container(
++                                                alignment: Alignment.topCenter,
++                                              ),
++                                            const Spacer(),
++                                          ],
+                                         ),
+                                       ],
+                                     ),
+-                                  ],
+-                                ),
++                                  ),
++                                ],
+                               ),
+                             ],
+                           ),
+-                        ],
+-                      ),
++                        ),
++                      ],
+                     ),
+-                  );
+-                },
+-              );
++                  ],
++                ),
++              ),
++            );
++          },
++        );
+   }
+ }
