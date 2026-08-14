@@ -339,7 +339,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
       }
 
       bool isExitedInRange = false;
-      if (exitDateTime != null) {
+      if (exitDateTime != null && b.status.trim().toUpperCase() != 'PARKED') {
         isExitedInRange =
             (exitDateTime.isAtSameMomentAs(start) ||
                 exitDateTime.isAfter(start)) &&
@@ -371,10 +371,57 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
   }
 
   _SummaryTotals _computeTotals(List<Bookingdata> list) {
+    DateTime start = _selectedStartDate ?? _defaultStartDate;
+    DateTime end = _selectedEndDate ?? _defaultEndDate;
+
+    if (_isFirstReport) {
+      start = DateTime(start.year, start.month, start.day, 0, 0, 0);
+      end = DateTime(end.year, end.month, end.day, 23, 59, 59);
+    }
+
     final totals = _SummaryTotals();
     for (final b in list) {
-      final amount = _amountForBooking(b);
+      final bookingDateTime = _combineDateTime(b.bookingDate, b.bookingTime);
+      final exitDateTime =
+          (b.exitvehicledate.trim().isNotEmpty &&
+                  b.exitvehicletime.trim().isNotEmpty)
+              ? _combineDateTime(b.exitvehicledate, b.exitvehicletime)
+              : null;
+
+      bool isBookedInRange = false;
+      if (bookingDateTime != null) {
+        isBookedInRange =
+            (bookingDateTime.isAtSameMomentAs(start) ||
+                bookingDateTime.isAfter(start)) &&
+            (bookingDateTime.isAtSameMomentAs(end) ||
+                bookingDateTime.isBefore(end));
+      }
+
+      bool isExitedInRange = false;
+      if (exitDateTime != null && b.status.trim().toUpperCase() != 'PARKED') {
+        isExitedInRange =
+            (exitDateTime.isAtSameMomentAs(start) ||
+                exitDateTime.isAfter(start)) &&
+            (exitDateTime.isAtSameMomentAs(end) || exitDateTime.isBefore(end));
+      }
+
       final sts = b.sts.trim().toLowerCase();
+      final isPassOrSub =
+          isSubscriptionSts(sts) ||
+          RegExp(r'^\d+(?:hr|h)$', caseSensitive: false).hasMatch(sts);
+
+      // Prevent double counting across shifts:
+      // Passes are paid upfront; only include in totals if booked during this report's range.
+      if (isPassOrSub && !isBookedInRange) {
+        continue;
+      }
+
+      // Hourly is paid on exit; only include in totals if exited during this report's range.
+      if (!isPassOrSub && !isExitedInRange) {
+        continue;
+      }
+
+      final amount = _amountForBooking(b);
 
       if (RegExp(r'^\d+(?:hr|h)$', caseSensitive: false).hasMatch(sts)) {
         final hours = int.tryParse(sts.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
@@ -497,7 +544,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
 
     final entryCount = list.length;
     final exitCount =
-        list.where((b) => b.exitvehicledate.trim().isNotEmpty).length;
+        list.where((b) => b.exitvehicledate.trim().isNotEmpty && b.status.trim().toUpperCase() != 'PARKED').length;
 
     final reportDate = DateFormat('dd-MM-yyyy').format(now);
     final reportTime = DateFormat('hh:mm a').format(now);
@@ -651,7 +698,10 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
               _isLoading
                   ? const Center(child: LoadingGif())
                   : Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 12,
+                    ),
                     child: Column(
                       children: [
                         Row(
@@ -912,7 +962,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
 
   Widget _buildReportCard(dynamic report, int index) {
     final isSelected = _selectedReportIndex == index;
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -930,199 +980,200 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
           ),
         ),
         padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Row 1: Date & Emp ID
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                report['reportdate_time'] ?? 'N/A',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                  color: Colors.black,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Row 1: Date & Emp ID
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  report['reportdate_time'] ?? 'N/A',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: Colors.black,
+                  ),
                 ),
-              ),
-              Text(
-                'Emp ID: ${report['empid'] ?? 'N/A'}',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: Colors.grey[600],
+                Text(
+                  'Emp ID: ${report['empid'] ?? 'N/A'}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
+              ],
+            ),
+            const SizedBox(height: 8),
 
-          // Row 2: Cash, Online, Total
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Cash: ₹${report['cash'] ?? '0'}',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: Colors.green[700],
-                  fontWeight: FontWeight.bold,
+            // Row 2: Cash, Online, Total
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Cash: ₹${report['cash'] ?? '0'}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.green[700],
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              Text(
-                'Online: ₹${report['online'] ?? '0'}',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: Colors.blue[700],
-                  fontWeight: FontWeight.bold,
+                Text(
+                  'Online: ₹${report['online'] ?? '0'}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.blue[700],
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              Text(
-                'Total: ₹${report['totals'] ?? (double.parse(report['cash']?.toString() ?? '0') + double.parse(report['online']?.toString() ?? '0')).toStringAsFixed(0)}',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
+                Text(
+                  'Total: ₹${report['totals'] ?? (double.parse(report['cash']?.toString() ?? '0') + double.parse(report['online']?.toString() ?? '0')).toStringAsFixed(0)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
 
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Divider(height: 1, thickness: 1),
-          ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Divider(height: 1, thickness: 1),
+            ),
 
-          // Row 3: From & To
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildLabeledText('From: ', report['fromdate_time'] ?? 'N/A'),
-              _buildLabeledText('To: ', report['todate_time'] ?? 'N/A'),
-            ],
-          ),
-          const SizedBox(height: 8),
+            // Row 3: From & To
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildLabeledText('From: ', report['fromdate_time'] ?? 'N/A'),
+                _buildLabeledText('To: ', report['todate_time'] ?? 'N/A'),
+              ],
+            ),
+            const SizedBox(height: 8),
 
-          // Row 4: Entries & Exits (Car and Bike)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Car Stats
-              Row(
-                children: [
-                  Icon(
-                    Icons.directions_car,
-                    color: ColorUtils.primarycolor(),
-                    size: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  _buildLabeledText(
-                    'Entries: ',
-                    '${report['entry'] ?? 0}',
-                    isBoldValue: true,
-                  ),
-                  const SizedBox(width: 12),
-                  _buildLabeledText(
-                    'Exits: ',
-                    '${report['exit'] ?? 0}',
-                    isBoldValue: true,
-                  ),
-                ],
-              ),
-              // Bike Stats (Using same entry/exit counts for now as backend doesn't split them)
-              Row(
-                children: [
-                  Icon(
-                    Icons.two_wheeler,
-                    color: ColorUtils.primarycolor(),
-                    size: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  _buildLabeledText(
-                    'Entries: ',
-                    '${report['entry'] ?? 0}',
-                    isBoldValue: true,
-                  ),
-                  const SizedBox(width: 12),
-                  _buildLabeledText(
-                    'Exits: ',
-                    '${report['exit'] ?? 0}',
-                    isBoldValue: true,
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Row 5: Buttons
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 36,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _reprintReport(report),
-                    icon: Icon(
-                      Icons.print,
-                      size: 16,
+            // Row 4: Entries & Exits (Car and Bike)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Car Stats
+                Row(
+                  children: [
+                    Icon(
+                      Icons.directions_car,
                       color: ColorUtils.primarycolor(),
+                      size: 16,
                     ),
-                    label: Text(
-                      'Re-print Report',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(width: 4),
+                    _buildLabeledText(
+                      'Entries: ',
+                      '${report['entry'] ?? 0}',
+                      isBoldValue: true,
+                    ),
+                    const SizedBox(width: 12),
+                    _buildLabeledText(
+                      'Exits: ',
+                      '${report['exit'] ?? 0}',
+                      isBoldValue: true,
+                    ),
+                  ],
+                ),
+                // Bike Stats (Using same entry/exit counts for now as backend doesn't split them)
+                Row(
+                  children: [
+                    Icon(
+                      Icons.two_wheeler,
+                      color: ColorUtils.primarycolor(),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    _buildLabeledText(
+                      'Entries: ',
+                      '${report['entry'] ?? 0}',
+                      isBoldValue: true,
+                    ),
+                    const SizedBox(width: 12),
+                    _buildLabeledText(
+                      'Exits: ',
+                      '${report['exit'] ?? 0}',
+                      isBoldValue: true,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Row 5: Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 36,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _reprintReport(report),
+                      icon: Icon(
+                        Icons.print,
+                        size: 16,
                         color: ColorUtils.primarycolor(),
                       ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ColorUtils.primarycolor().withOpacity(
-                        0.1,
+                      label: Text(
+                        'Re-print Report',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: ColorUtils.primarycolor(),
+                        ),
                       ),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColorUtils.primarycolor().withOpacity(
+                          0.1,
+                        ),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 36,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      _showReportDetails(report);
-                    },
-                    icon: const Icon(
-                      Icons.visibility,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                    label: Text(
-                      'View Details',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: SizedBox(
+                    height: 36,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        _showReportDetails(report);
+                      },
+                      icon: const Icon(
+                        Icons.visibility,
+                        size: 16,
                         color: Colors.white,
                       ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ColorUtils.primarycolor(),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
+                      label: Text(
+                        'View Details',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColorUtils.primarycolor(),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   void _showReportDetails(dynamic report) {
@@ -1161,14 +1212,48 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildDialogRow('Hourly', report['hourlycount']?.toString() ?? '0', report['hourlyamount']?.toString() ?? '0'),
-                  _buildDialogRow('12 Hours Pass', report['12hrsveh']?.toString() ?? '0', report['12hrsvehamt']?.toString() ?? '0'),
-                  _buildDialogRow('24 Hours Pass', report['24hrsveh']?.toString() ?? '0', report['24hrsvehamt']?.toString() ?? '0'),
-                  _buildDialogRow('48 Hours Pass', report['48hrsveh']?.toString() ?? '0', report['48hrsvehamt']?.toString() ?? '0'),
-                  _buildDialogRow('72 Hours Pass', report['72hrsveh']?.toString() ?? '0', report['72hrsvehamt']?.toString() ?? '0'),
-                  _buildDialogRow('Weekly Pass\n(7 Days)', report['7daysveh']?.toString() ?? '0', report['7daysvehamt']?.toString() ?? '0', isMultiline: true),
-                  _buildDialogRow('15 Days Pass', report['15daysveh']?.toString() ?? '0', report['15daysvehamt']?.toString() ?? '0'),
-                  _buildDialogRow('Monthly Pass\n(30 Days)', report['30daysveh']?.toString() ?? '0', report['30daysvehamt']?.toString() ?? '0', isMultiline: true),
+                  _buildDialogRow(
+                    'Hourly',
+                    report['hourlycount']?.toString() ?? '0',
+                    report['hourlyamount']?.toString() ?? '0',
+                  ),
+                  _buildDialogRow(
+                    '12 Hours Pass',
+                    report['12hrsveh']?.toString() ?? '0',
+                    report['12hrsvehamt']?.toString() ?? '0',
+                  ),
+                  _buildDialogRow(
+                    '24 Hours Pass',
+                    report['24hrsveh']?.toString() ?? '0',
+                    report['24hrsvehamt']?.toString() ?? '0',
+                  ),
+                  _buildDialogRow(
+                    '48 Hours Pass',
+                    report['48hrsveh']?.toString() ?? '0',
+                    report['48hrsvehamt']?.toString() ?? '0',
+                  ),
+                  _buildDialogRow(
+                    '72 Hours Pass',
+                    report['72hrsveh']?.toString() ?? '0',
+                    report['72hrsvehamt']?.toString() ?? '0',
+                  ),
+                  _buildDialogRow(
+                    'Weekly Pass\n(7 Days)',
+                    report['7daysveh']?.toString() ?? '0',
+                    report['7daysvehamt']?.toString() ?? '0',
+                    isMultiline: true,
+                  ),
+                  _buildDialogRow(
+                    '15 Days Pass',
+                    report['15daysveh']?.toString() ?? '0',
+                    report['15daysvehamt']?.toString() ?? '0',
+                  ),
+                  _buildDialogRow(
+                    'Monthly Pass\n(30 Days)',
+                    report['30daysveh']?.toString() ?? '0',
+                    report['30daysvehamt']?.toString() ?? '0',
+                    isMultiline: true,
+                  ),
                   const Divider(height: 24, thickness: 1),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1248,13 +1333,19 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
     return parsed.toStringAsFixed(2);
   }
 
-  Widget _buildDialogRow(String label, String count, String amount, {bool isMultiline = false}) {
+  Widget _buildDialogRow(
+    String label,
+    String count,
+    String amount, {
+    bool isMultiline = false,
+  }) {
     double parsedAmount = double.tryParse(amount) ?? 0.0;
     String displayAmount = parsedAmount.toStringAsFixed(2);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
-        crossAxisAlignment: isMultiline ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        crossAxisAlignment:
+            isMultiline ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           Expanded(
             flex: 5,

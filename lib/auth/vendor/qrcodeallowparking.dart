@@ -1646,7 +1646,12 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                                                 await UniversalPrintHelper.getPrintAmountFromAPI(
                                                   bId,
                                                 );
-                                          } catch (_) {}
+                                            if (currentAmount.isEmpty || currentAmount == '0' || currentAmount == '0.0' || currentAmount == '0.00') {
+                                              currentAmount = bookingDetails!['amount']?.toString() ?? '0';
+                                            }
+                                          } catch (_) {
+                                            currentAmount = bookingDetails!['amount']?.toString() ?? '0';
+                                          }
                                           await UniversalPrintHelper.printTicket(
                                             context: context,
                                             vendorName:
@@ -2154,14 +2159,19 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         amountStr = await UniversalPrintHelper.getPrintAmountFromAPI(
           vehicle['_id']?.toString() ?? '',
         ).timeout(_apiTimeout);
-      } catch (_) {}
+        if (amountStr.isEmpty || amountStr == '0' || amountStr == '0.0' || amountStr == '0.00') {
+          amountStr = vehicle['amount']?.toString() ?? '0';
+        }
+      } catch (_) {
+        amountStr = vehicle['amount']?.toString() ?? '0';
+      }
 
       final amountVal = double.tryParse(amountStr.trim()) ?? 0.0;
       if (!mounted) return;
 
       if (amountVal <= 0) {
         setState(() => _isCheckingExit = false);
-        await _performQuickExit(vehicle, '0');
+        await _performQuickExit(vehicle, amountStr);
       } else {
         setState(() => _isCheckingExit = false);
         showModalBottomSheet(
@@ -2227,8 +2237,11 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(
           bookingId,
         ).timeout(_apiTimeout);
+        if (currentAmount.isEmpty || currentAmount == '0' || currentAmount == '0.0' || currentAmount == '0.00') {
+          currentAmount = vehicle['amount']?.toString() ?? '0';
+        }
       } catch (e) {
-        currentAmount = '0';
+        currentAmount = vehicle['amount']?.toString() ?? '0';
       }
 
       if (!mounted) return;

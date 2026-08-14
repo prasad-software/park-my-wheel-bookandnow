@@ -488,6 +488,32 @@ class _vSearchScreenState extends State<vSearchScreen>
         currentAmount = vehicle['amount']?.toString() ?? '0';
       }
 
+      if (mounted) {
+        setState(() {
+          // Optimistically update to COMPLETED instead of removing entirely
+          final now = DateTime.now();
+          final formattedDate = DateFormat('dd-MM-yyyy').format(now);
+          
+          for (var v in allVendors) {
+            if ((v['_id']?.toString() ?? v['id']?.toString() ?? '') == bookingId) {
+              v['status'] = 'COMPLETED';
+              v['exitvehicledate'] = formattedDate;
+              // Add a rough exit time just in case it's needed for UI
+              v['exitvehicletime'] = DateFormat('HH:mm').format(now);
+              break;
+            }
+          }
+          
+          // Remove from current filtered list (since we are on 'On Parking' tab)
+          filteredVendors.removeWhere(
+            (v) =>
+                (v['_id']?.toString() ?? v['id']?.toString() ?? '') ==
+                bookingId,
+          );
+          _isExiting.remove(bookingId);
+        });
+      }
+
       if (!mounted) return;
       try {
         await UniversalPrintHelper.printTicket(
@@ -524,34 +550,9 @@ class _vSearchScreenState extends State<vSearchScreen>
         print('Print & Exit: print failed: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Print failed. Continuing with exit...')),
+            const SnackBar(content: Text('Print failed. Continuing with exit...')),
           );
         }
-      }
-      if (mounted) {
-        setState(() {
-          // Optimistically update to COMPLETED instead of removing entirely
-          final now = DateTime.now();
-          final formattedDate = DateFormat('dd-MM-yyyy').format(now);
-          
-          for (var v in allVendors) {
-            if ((v['_id']?.toString() ?? v['id']?.toString() ?? '') == bookingId) {
-              v['status'] = 'COMPLETED';
-              v['exitvehicledate'] = formattedDate;
-              // Add a rough exit time just in case it's needed for UI
-              v['exitvehicletime'] = DateFormat('HH:mm').format(now);
-              break;
-            }
-          }
-          
-          // Remove from current filtered list (since we are on 'On Parking' tab)
-          filteredVendors.removeWhere(
-            (v) =>
-                (v['_id']?.toString() ?? v['id']?.toString() ?? '') ==
-                bookingId,
-          );
-          _isExiting.remove(bookingId);
-        });
       }
 
       // Fire and forget the exit API call

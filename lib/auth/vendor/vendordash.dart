@@ -1840,6 +1840,11 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
                             vendorId: widget.vendorid,
                             bookType: vehicle.bookType ?? '',
                             defaultVendorName: widget.defaultVendorName,
+                            onExitSuccess: () {
+                              final currentData = bookingDataNotifier.value.toList();
+                              currentData.removeWhere((v) => v.id == vehicle.id);
+                              bookingDataNotifier.value = currentData;
+                            },
                           );
                         },
                       ),
@@ -2337,6 +2342,11 @@ class _BikesTabState extends State<BikesTab>
                             vendorId: widget.vendorid,
                             bookType: vehicle.bookType ?? '',
                             defaultVendorName: widget.defaultVendorName,
+                            onExitSuccess: () {
+                              final currentData = bookingDataNotifier.value.toList();
+                              currentData.removeWhere((v) => v.id == vehicle.id);
+                              bookingDataNotifier.value = currentData;
+                            },
                           );
                         },
                       ),
@@ -2874,6 +2884,11 @@ class _OthersTabState extends State<OthersTab>
                             vendorId: widget.vendorid,
                             bookType: vehicle.bookType ?? '',
                             defaultVendorName: widget.defaultVendorName,
+                            onExitSuccess: () {
+                              final currentData = bookingDataNotifier.value.toList();
+                              currentData.removeWhere((v) => v.id == vehicle.id);
+                              bookingDataNotifier.value = currentData;
+                            },
                           );
                         },
                       ),
@@ -4806,6 +4821,7 @@ class cardashleft extends StatelessWidget {
   final String vendorId; // Add vendorId parameter
   final String bookType; // Add bookType parameter
   final String? defaultVendorName;
+  final VoidCallback? onExitSuccess;
   const cardashleft({
     super.key,
     required this.vehicle,
@@ -4813,6 +4829,7 @@ class cardashleft extends StatelessWidget {
     required this.vendorId,
     required this.bookType,
     this.defaultVendorName,
+    this.onExitSuccess,
   });
 
   String _formatDuration(Duration? duration) {
@@ -5158,6 +5175,7 @@ class cardashleft extends StatelessWidget {
                                                       bookType: bookType,
                                                       defaultVendorName:
                                                           defaultVendorName,
+                                                      onExitSuccess: onExitSuccess,
                                                     ),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.white,
@@ -5458,6 +5476,7 @@ class bikedashleft extends StatelessWidget {
   final String vendorId; // Add vendorId parameter
   final String bookType; // Add bookType parameter
   final String? defaultVendorName;
+  final VoidCallback? onExitSuccess;
   const bikedashleft({
     super.key,
     required this.vehicle,
@@ -5465,6 +5484,7 @@ class bikedashleft extends StatelessWidget {
     required this.vendorId,
     required this.bookType,
     this.defaultVendorName,
+    this.onExitSuccess,
   });
   String formatWithSuffix(DateTime date) {
     int day = date.day;
@@ -5793,7 +5813,7 @@ class bikedashleft extends StatelessWidget {
                                         ),
                                       ),
                                       // Print & Exit Button
-                                      if (currentTabIndex == 0 &&
+                                      if (currentTabIndex == 1 &&
                                           vehicle.sts == 'Instant')
                                         Padding(
                                           padding: const EdgeInsets.only(
@@ -5809,6 +5829,7 @@ class bikedashleft extends StatelessWidget {
                                                       bookType: bookType,
                                                       defaultVendorName:
                                                           defaultVendorName,
+                                                      onExitSuccess: onExitSuccess,
                                                     ),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.white,
@@ -6109,6 +6130,7 @@ class othersdashleft extends StatelessWidget {
   final String vendorId; // Add vendorId parameter
   final String bookType; // Add bookType parameter
   final String? defaultVendorName;
+  final VoidCallback? onExitSuccess;
   const othersdashleft({
     super.key,
     required this.vehicle,
@@ -6116,6 +6138,7 @@ class othersdashleft extends StatelessWidget {
     required this.vendorId,
     required this.bookType,
     this.defaultVendorName,
+    this.onExitSuccess,
   });
   String formatWithSuffix(DateTime date) {
     int day = date.day;
@@ -6444,7 +6467,7 @@ class othersdashleft extends StatelessWidget {
                                         ),
                                       ),
                                       // Print & Exit Button
-                                      if (currentTabIndex == 0 &&
+                                      if (currentTabIndex == 2 &&
                                           vehicle.sts == 'Instant')
                                         Padding(
                                           padding: const EdgeInsets.only(
@@ -6460,6 +6483,7 @@ class othersdashleft extends StatelessWidget {
                                                       bookType: bookType,
                                                       defaultVendorName:
                                                           defaultVendorName,
+                                                      onExitSuccess: onExitSuccess,
                                                     ),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.white,
@@ -7578,6 +7602,7 @@ class DashQuickExitHelper {
     required String vendorId,
     required String bookType,
     String? defaultVendorName,
+    VoidCallback? onExitSuccess,
   }) async {
     final String bookingId = vehicle.id;
     if (bookingId.isEmpty) {
@@ -7600,7 +7625,7 @@ class DashQuickExitHelper {
           currentAmount = vehicle.amount.toString();
         }
       } catch (_) {
-        currentAmount = '0';
+        currentAmount = vehicle.amount.toString();
       }
 
       if (!context.mounted) return;
@@ -7630,6 +7655,9 @@ class DashQuickExitHelper {
       }
 
       await _performQuickExit(context, vehicle, currentAmount);
+      if (onExitSuccess != null) {
+        onExitSuccess();
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(

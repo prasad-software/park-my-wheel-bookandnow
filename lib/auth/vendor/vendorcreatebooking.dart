@@ -1514,7 +1514,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
   }
 
   bool _isValetChargeApplicable() {
-    return _isValetUIApplicable() && _selectedPass == null;
+    return _isValetUIApplicable() && _selectedPass == null && _selectedOption != 'Subscription';
   }
 
   bool _is15DaySubscriptionSelected() {
