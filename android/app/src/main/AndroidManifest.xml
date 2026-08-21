@@ -71,5 +71,7 @@
         <package android:name="com.sunmi.peripheral.printer" />
         <!-- Sumi printer peripheral service (if different from Sunmi) -->
         <package android:name="com.summi.peripheral.printer" />
+        <!-- PineLabs SDK service -->
+        <package android:name="com.pinelabs.masterapp" />
     </queries>
 </manifest>

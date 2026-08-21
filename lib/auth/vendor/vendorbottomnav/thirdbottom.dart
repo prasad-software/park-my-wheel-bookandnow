@@ -68,6 +68,7 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
   bool _vehicleUploadEnabled = false;
   bool _slotViewEnabled = false;
   bool _valetEnabled = false;
+  bool _isPineLabsEnabled = false;
 
   String _defaultVehicleType = 'Car';
 
@@ -287,8 +288,8 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
   @override
   void initState() {
     super.initState();
-
-    fetchFullDayMode('car');    // for car switch
+    _loadPineLabsState();
+    fetchamenities(widget.vendorid).then((value) {});    // for car switch
     fetchFullDayMode('bike'); // for bike switch
     fetchFullDayMode('others'); // for others switch
     // Initial fetch functions
@@ -356,6 +357,22 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
       }
     });
   }
+
+  Future<void> _loadPineLabsState() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isPineLabsEnabled = prefs.getBool('isPineLabsEnabled') ?? false;
+    });
+  }
+
+  Future<void> _togglePineLabs(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isPineLabsEnabled', value);
+    setState(() {
+      _isPineLabsEnabled = value;
+    });
+  }
+
   Future<void> fetchChargesData() async {
     setState(() {
       isLoading = true;
@@ -512,6 +529,10 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
 
   // Fetch toggle states from backend
   Future<void> _fetchToggleStates() async {
+    setState(() {
+      isLoading = true;
+    });
+
     try {
       final prefs = await SharedPreferences.getInstance();
       
@@ -551,6 +572,10 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
     } catch (error) {
       // If API doesn't exist yet, use default values (false)
       print('Error fetching toggle states: $error');
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -1738,6 +1763,22 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
                     },
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildToggleButton(
+                    label: "PineLabs",
+                    value: _isPineLabsEnabled,
+                    onChanged: (value) {
+                      _togglePineLabs(value);
+                    },
+                  ),
+                ),
+                Expanded(child: SizedBox()),
+                Expanded(child: SizedBox()),
               ],
             ),
             const SizedBox(height: 10),

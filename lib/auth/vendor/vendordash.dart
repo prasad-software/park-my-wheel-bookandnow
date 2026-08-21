@@ -1841,8 +1841,11 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
                             bookType: vehicle.bookType ?? '',
                             defaultVendorName: widget.defaultVendorName,
                             onExitSuccess: () {
-                              final currentData = bookingDataNotifier.value.toList();
-                              currentData.removeWhere((v) => v.id == vehicle.id);
+                              final currentData =
+                                  bookingDataNotifier.value.toList();
+                              currentData.removeWhere(
+                                (v) => v.id == vehicle.id,
+                              );
                               bookingDataNotifier.value = currentData;
                             },
                           );
@@ -2343,8 +2346,11 @@ class _BikesTabState extends State<BikesTab>
                             bookType: vehicle.bookType ?? '',
                             defaultVendorName: widget.defaultVendorName,
                             onExitSuccess: () {
-                              final currentData = bookingDataNotifier.value.toList();
-                              currentData.removeWhere((v) => v.id == vehicle.id);
+                              final currentData =
+                                  bookingDataNotifier.value.toList();
+                              currentData.removeWhere(
+                                (v) => v.id == vehicle.id,
+                              );
                               bookingDataNotifier.value = currentData;
                             },
                           );
@@ -2885,8 +2891,11 @@ class _OthersTabState extends State<OthersTab>
                             bookType: vehicle.bookType ?? '',
                             defaultVendorName: widget.defaultVendorName,
                             onExitSuccess: () {
-                              final currentData = bookingDataNotifier.value.toList();
-                              currentData.removeWhere((v) => v.id == vehicle.id);
+                              final currentData =
+                                  bookingDataNotifier.value.toList();
+                              currentData.removeWhere(
+                                (v) => v.id == vehicle.id,
+                              );
                               bookingDataNotifier.value = currentData;
                             },
                           );
@@ -5175,7 +5184,8 @@ class cardashleft extends StatelessWidget {
                                                       bookType: bookType,
                                                       defaultVendorName:
                                                           defaultVendorName,
-                                                      onExitSuccess: onExitSuccess,
+                                                      onExitSuccess:
+                                                          onExitSuccess,
                                                     ),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.white,
@@ -5829,7 +5839,8 @@ class bikedashleft extends StatelessWidget {
                                                       bookType: bookType,
                                                       defaultVendorName:
                                                           defaultVendorName,
-                                                      onExitSuccess: onExitSuccess,
+                                                      onExitSuccess:
+                                                          onExitSuccess,
                                                     ),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.white,
@@ -6483,7 +6494,8 @@ class othersdashleft extends StatelessWidget {
                                                       bookType: bookType,
                                                       defaultVendorName:
                                                           defaultVendorName,
-                                                      onExitSuccess: onExitSuccess,
+                                                      onExitSuccess:
+                                                          onExitSuccess,
                                                     ),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.white,
@@ -7724,7 +7736,6 @@ class DashQuickExitHelper {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Vehicle exited successfully (Cash)!')),
         );
-
       }
     } else {
       throw Exception('Failed to exit vehicle (${response.statusCode})');

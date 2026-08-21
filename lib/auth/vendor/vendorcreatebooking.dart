@@ -27,6 +27,7 @@ import 'menus/parkingchart.dart';
 import 'upi_payment_qr.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'vendorsearch.dart';
+import 'package:mywheels/services/plutus_smart.dart';
 
 class vendorChooseParkingPage extends StatefulWidget {
   final String vendorid;
@@ -66,6 +67,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
   int? _selectedPass;
   String _paymentType = 'On Entry';
   String _paymentMode = 'Online';
+  String _pinelabsPaymentMethod = 'Card';
   String? _vendorUpiId;
   Map<String, bool> _enabledSettings = {};
 
@@ -233,6 +235,10 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                 double.tryParse(savedValetCharge) ?? _valetChargeSetting;
           });
         }
+        
+        setState(() {
+          _isPineLabsEnabled = prefs.getBool('isPineLabsEnabled') ?? false;
+        });
 
         if (_valetEnabled) {
           _fetchValetDrivers();
@@ -386,6 +392,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
   late Timer _timer;
   final String apiUrl = '${ApiConfig.baseUrl}get-slot-details-vendor';
   bool _isLoading = false;
+  bool _isPineLabsEnabled = false;
   String _activeLoadingButton = '';
   String? _selectedSubscription;
   String? dropdownValue;
@@ -1514,7 +1521,9 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
   }
 
   bool _isValetChargeApplicable() {
-    return _isValetUIApplicable() && _selectedPass == null && _selectedOption != 'Subscription';
+    return _isValetUIApplicable() &&
+        _selectedPass == null &&
+        _selectedOption != 'Subscription';
   }
 
   bool _is15DaySubscriptionSelected() {
@@ -2303,14 +2312,102 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     }
   }
 
-  // Function to print ticket and exit
-  Future<void> _printAndExit() async {
-    // First check if we have slot data
-    if (_availableSlots == null) {
-      _showError('Unable to check parking availability. Please try again.');
+  Future<void> _payNowAndPrint() async {
+    String vehicleType = cate[_selectedIndex];
+    String amountStr = '';
+
+    if (_selectedOption == 'Instant' || _selectedOption == 'Pass') {
+      amountStr = _selectedAmountForBooking(vehicleType);
+    } else {
+      amountStr = _selectedAmountForBooking(vehicleType);
+    }
+
+    if (amountStr.isEmpty || amountStr == "Amount not found") {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid amount. Cannot process payment.')),
+      );
       return;
     }
 
+    // Clean amount (remove anything that's not a digit or period)
+    amountStr = amountStr.replaceAll(RegExp(r'[^0-9.]'), '');
+    int amountInPaise = (double.parse(amountStr) * 100).toInt();
+
+    setState(() {
+      _isLoading = true;
+      _activeLoadingButton = 'payNow';
+    });
+
+    try {
+      // Transaction JSON Payload required by PineLabs MasterApp
+      Map<String, dynamic> payload = {
+        "Detail": {
+          "BillingRefNo": "PMW_${DateTime.now().millisecondsSinceEpoch}",
+          "PaymentAmount": amountInPaise, // Amount in Paise as expected by configured terminal
+          "TransactionType": _pinelabsPaymentMethod == 'UPI' ? 5120 : 4001,
+        },
+        "Header": {
+          "ApplicationId": "78d73040662d412d9dfdc5b9ce532d19",
+          "MethodId": "1001",
+          "UserId": "user1234",
+          "VersionNo": "1.0",
+        }
+      };
+      String transactionData = jsonEncode(payload);
+
+      // Ensure service is bound
+      await PlutusSmart.bindToService();
+
+      // Trigger transaction
+      String result = await PlutusSmart.startTransaction(transactionData);
+      
+      setState(() {
+        _isLoading = false;
+        _activeLoadingButton = '';
+      });
+
+      String responseCode = "";
+      String responseMessage = result;
+      
+      try {
+        Map<String, dynamic> responseData = jsonDecode(result);
+        if (responseData.containsKey('Response')) {
+          responseCode = responseData['Response']['ResponseCode']?.toString() ?? "";
+          responseMessage = responseData['Response']['ResponseMsg']?.toString() 
+                            ?? responseData['Response']['ResponseMessage']?.toString() 
+                            ?? result;
+        } else if (responseData.containsKey('Detail')) {
+          responseCode = responseData['Detail']['ResponseCode']?.toString() ?? "";
+          responseMessage = responseData['Detail']['ResponseMessage']?.toString() ?? result;
+        }
+      } catch (e) {
+        // Not a JSON string
+      }
+
+      if (responseCode == "00") { // Indicates success
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PineLabs Payment Successful!')),
+        );
+        // Automatically print and create booking on backend
+        await _printAndExit();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment Failed: $responseMessage')),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _activeLoadingButton = '';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error initiating payment: $e')),
+      );
+    }
+  }
+
+  // Function to print ticket and exit
+  Future<void> _printAndExit() async {
     // Determine vehicle type
     String vehicleType;
     switch (_selectedIndex) {
@@ -3061,10 +3158,10 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                           ),
                           const SizedBox(width: 8),
                           _buildActionButton(
-                            "Print and Exit",
-                            Icons.exit_to_app,
+                            (_isPineLabsEnabled && _paymentMode == 'Online') ? "Pay Now" : "Print and Exit",
+                            (_isPineLabsEnabled && _paymentMode == 'Online') ? Icons.payment : Icons.exit_to_app,
                             ColorUtils.primarycolor(),
-                            _printAndExit,
+                            (_isPineLabsEnabled && _paymentMode == 'Online') ? _payNowAndPrint : _printAndExit,
                             isDisabled: !(_printEnabled && _exitEnabled),
                             // isLoading: _isLoading && _activeLoadingButton == 'printAndExit',
                           ),
@@ -3202,6 +3299,45 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                         ],
                       ),
                       const SizedBox(height: 15),
+
+                      if (_isPineLabsEnabled && _paymentMode == 'Online') ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "PineLabs Payment Method",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Wrap(
+                                    spacing: 4,
+                                    runSpacing: 4,
+                                    children: [
+                                      _buildRadioOption(
+                                        "Card",
+                                        _pinelabsPaymentMethod == "Card",
+                                        (v) => setState(() => _pinelabsPaymentMethod = v!),
+                                      ),
+                                      _buildRadioOption(
+                                        "UPI",
+                                        _pinelabsPaymentMethod == "UPI",
+                                        (v) => setState(() => _pinelabsPaymentMethod = v!),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 15),
+                      ],
 
                       if (_paymentMode == 'Online') _buildInlineUpiQr(),
                       const SizedBox(height: 10),
