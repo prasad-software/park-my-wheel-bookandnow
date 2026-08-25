@@ -36,6 +36,8 @@ class _vSearchScreenState extends State<vSearchScreen>
   final Map<String, bool> _isExiting = {};
   final Map<String, bool> _isCheckingExit =
       {}; // awaiting amount before showing exit popup
+  final Map<String, String> _paymentModes =
+      {}; // tracks selected payment mode per booking
 
   static const Duration _printTimeout = Duration(seconds: 18);
   static const Duration _apiTimeout = Duration(seconds: 20);
@@ -76,7 +78,7 @@ class _vSearchScreenState extends State<vSearchScreen>
 
       if (!mounted) return;
       setState(() => _isCheckingExit.remove(bookingId));
-      
+
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -88,13 +90,15 @@ class _vSearchScreenState extends State<vSearchScreen>
               return Container(
                 decoration: const BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(20),
-                  ),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
-                child: Exitpage(
-                  currentTabIndex: 0,
-                  userid: vehicle['userid'] ?? vehicle['userId'] ?? '',
+                child: (() {
+                  final String pmKey = vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? bookingId;
+                  final String paymentMode = _paymentModes[pmKey] ?? 'Online';
+                  return Exitpage(
+                    paymentMode: paymentMode,
+                    currentTabIndex: 0,
+                    userid: vehicle['userid'] ?? vehicle['userId'] ?? '',
                   otp: vehicle['otp'] ?? '',
                   vehicletype: vehicle['vehicleType'] ?? '',
                   bookingid: bookingId,
@@ -109,28 +113,38 @@ class _vSearchScreenState extends State<vSearchScreen>
                   sts: vehicle['sts'] ?? '',
                   cartype: vehicle['carType'] ?? '',
                   vendorid: vehicle['vendorId'] ?? widget.vendorid,
-                  bookType: vehicle['bookType'] ?? '',
+                  bookType: vehicle['bookType'] ?? 'Hourly',
                   onExitSuccess: () {
                     final now = DateTime.now();
                     final formattedDate = DateFormat('dd-MM-yyyy').format(now);
                     setState(() {
                       for (var v in allVendors) {
-                        if ((v['_id']?.toString() ?? v['id']?.toString() ?? '') == bookingId) {
+                        if ((v['_id']?.toString() ??
+                                v['id']?.toString() ??
+                                '') ==
+                            bookingId) {
                           v['status'] = 'COMPLETED';
                           v['exitvehicledate'] = formattedDate;
-                          v['exitvehicletime'] = DateFormat('HH:mm').format(now);
+                          v['exitvehicletime'] = DateFormat(
+                            'HH:mm',
+                          ).format(now);
                           break;
                         }
                       }
                       // Remove from current filtered list (since we are on 'On Parking' tab)
                       filteredVendors.removeWhere(
-                        (v) => (v['_id']?.toString() ?? v['id']?.toString() ?? '') == bookingId,
+                        (v) =>
+                            (v['_id']?.toString() ??
+                                v['id']?.toString() ??
+                                '') ==
+                            bookingId,
                       );
                     });
-                  // Still fetch to ensure consistency, but UI is already updated
-                  fetchVendors(showLoading: false);
-                },
-              ), // closes Exitpage
+                    // Still fetch to ensure consistency, but UI is already updated
+                    fetchVendors(showLoading: false);
+                  },
+                );
+              })(), // closes IIFE and Container
               ); // closes Container
             }, // closes builder
           ); // closes DraggableScrollableSheet
@@ -493,9 +507,10 @@ class _vSearchScreenState extends State<vSearchScreen>
           // Optimistically update to COMPLETED instead of removing entirely
           final now = DateTime.now();
           final formattedDate = DateFormat('dd-MM-yyyy').format(now);
-          
+
           for (var v in allVendors) {
-            if ((v['_id']?.toString() ?? v['id']?.toString() ?? '') == bookingId) {
+            if ((v['_id']?.toString() ?? v['id']?.toString() ?? '') ==
+                bookingId) {
               v['status'] = 'COMPLETED';
               v['exitvehicledate'] = formattedDate;
               // Add a rough exit time just in case it's needed for UI
@@ -503,7 +518,7 @@ class _vSearchScreenState extends State<vSearchScreen>
               break;
             }
           }
-          
+
           // Remove from current filtered list (since we are on 'On Parking' tab)
           filteredVendors.removeWhere(
             (v) =>
@@ -550,7 +565,9 @@ class _vSearchScreenState extends State<vSearchScreen>
         print('Print & Exit: print failed: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Print failed. Continuing with exit...')),
+            const SnackBar(
+              content: Text('Print failed. Continuing with exit...'),
+            ),
           );
         }
       }
@@ -621,10 +638,13 @@ class _vSearchScreenState extends State<vSearchScreen>
 
       final parkingCharge = double.tryParse(amount.trim()) ?? 0.0;
 
+      final String pmKey = vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? bookingId;
+      final paymentMode = _paymentModes[pmKey] ?? 'Online';
+
       final Map<String, dynamic> requestBody = {
         'amount': parkingCharge,
         'hour': formattedDuration,
-        'paymentMode': 'Cash',
+        'paymentMode': paymentMode,
       };
 
       final userId =
@@ -667,8 +687,8 @@ class _vSearchScreenState extends State<vSearchScreen>
       if (response.statusCode == 200) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Vehicle exited successfully (Cash)!'),
+             SnackBar(
+              content: Text('Vehicle exited successfully ($paymentMode)!'),
             ),
           );
         }
@@ -881,9 +901,65 @@ class _vSearchScreenState extends State<vSearchScreen>
         titleSpacing: 0,
         backgroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.black),
-        title: Text(
-          'Search Parking Booking',
-          style: GoogleFonts.poppins(color: Colors.black, fontSize: 18),
+        title: Padding(
+          padding: const EdgeInsets.only(right: 15.0),
+          child: TextFormField(
+            controller: searchController,
+            autofocus: true,
+            onChanged: filterVendors,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: const Color(0xFFF1F2F3),
+              border: OutlineInputBorder(
+                borderSide: BorderSide(
+                  color: ColorUtils.primarycolor(),
+                  width: 0.5,
+                ),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(5),
+                borderSide: BorderSide(
+                  color: ColorUtils.primarycolor(),
+                  width: 0.5,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(5),
+                borderSide: BorderSide(
+                  color: ColorUtils.primarycolor(),
+                  width: 0.5,
+                ),
+              ),
+              suffixIcon: GestureDetector(
+                onTap: () {
+                  print('build: Search icon tapped, reloading vSearchScreen');
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (context) => vSearchScreen(vendorid: widget.vendorid),
+                    ),
+                  );
+                },
+                child: Icon(Icons.search, color: ColorUtils.primarycolor()),
+              ),
+              constraints: const BoxConstraints(
+                maxHeight: 40,
+                maxWidth: double.infinity,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 8,
+                horizontal: 12,
+              ),
+              hintText: 'Search',
+              hintStyle: GoogleFonts.poppins(
+                fontWeight: FontWeight.w300,
+                fontSize: 14,
+                color: Colors.black,
+              ),
+            ),
+          ),
         ),
       ),
       body: SafeArea(
@@ -891,74 +967,6 @@ class _vSearchScreenState extends State<vSearchScreen>
           padding: const EdgeInsets.all(8.0),
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 7),
-                child: TextFormField(
-                  controller: searchController,
-                  autofocus:
-                      true, // Enable autofocus to make the textbox active on page entry
-                  onChanged: filterVendors,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: const Color(0xFFF1F2F3),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: ColorUtils.primarycolor(),
-                        width: 0.5,
-                      ),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(5),
-                      borderSide: BorderSide(
-                        color: ColorUtils.primarycolor(),
-                        width: 0.5,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(5),
-                      borderSide: BorderSide(
-                        color: ColorUtils.primarycolor(),
-                        width: 0.5,
-                      ),
-                    ),
-                    prefixIcon: GestureDetector(
-                      onTap: () {
-                        print(
-                          'build: Search icon tapped, reloading vSearchScreen',
-                        );
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (context) =>
-                                    vSearchScreen(vendorid: widget.vendorid),
-                          ),
-                        );
-                      },
-                      child: Icon(
-                        Icons.search,
-                        color: ColorUtils.primarycolor(),
-                      ),
-                    ),
-                    constraints: const BoxConstraints(
-                      maxHeight: 40,
-                      maxWidth: double.infinity,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 12,
-                    ),
-                    hintText: 'Search',
-                    hintStyle: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w300,
-                      fontSize: 14,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
               Expanded(
                 child: TabContainer(
                   controller: _tabController,
@@ -1070,8 +1078,8 @@ class _vSearchScreenState extends State<vSearchScreen>
                 print('build: Vehicle ${vehicle['vehicleNumber']} tapped');
                 // Add navigation logic if needed
               },
-              child: SizedBox(
-                height: 120,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 10),
                 child: Stack(
                   children: [
                     Positioned(
@@ -1099,7 +1107,7 @@ class _vSearchScreenState extends State<vSearchScreen>
                         child: Padding(
                           padding: const EdgeInsets.all(5.0),
                           child: Text(
-                            'Booking on : ${formatWithSuffix(parsedDate)}, $parkedTime',
+                            'Booked On : ${formatWithSuffix(parsedDate)}, $parkedTime',
                             style: GoogleFonts.poppins(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -1202,17 +1210,32 @@ class _vSearchScreenState extends State<vSearchScreen>
                                                     );
                                                     String currentAmount;
                                                     try {
-                                                      currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(
-                                                        bId,
-                                                      ).timeout(const Duration(seconds: 10));
-                                                      if (currentAmount.isEmpty ||
-                                                          currentAmount == '0' ||
-                                                          currentAmount == '0.0' ||
-                                                          currentAmount == '0.00') {
-                                                        currentAmount = vehicle['amount']?.toString() ?? '0';
+                                                      currentAmount =
+                                                          await UniversalPrintHelper.getPrintAmountFromAPI(
+                                                            bId,
+                                                          ).timeout(
+                                                            const Duration(
+                                                              seconds: 10,
+                                                            ),
+                                                          );
+                                                      if (currentAmount
+                                                              .isEmpty ||
+                                                          currentAmount ==
+                                                              '0' ||
+                                                          currentAmount ==
+                                                              '0.0' ||
+                                                          currentAmount ==
+                                                              '0.00') {
+                                                        currentAmount =
+                                                            vehicle['amount']
+                                                                ?.toString() ??
+                                                            '0';
                                                       }
                                                     } catch (_) {
-                                                      currentAmount = vehicle['amount']?.toString() ?? '0';
+                                                      currentAmount =
+                                                          vehicle['amount']
+                                                              ?.toString() ??
+                                                          '0';
                                                     }
 
                                                     await UniversalPrintHelper.printTicket(
@@ -1722,17 +1745,32 @@ class _vSearchScreenState extends State<vSearchScreen>
                                                     );
                                                     String currentAmount;
                                                     try {
-                                                      currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(
-                                                        bId,
-                                                      ).timeout(const Duration(seconds: 10));
-                                                      if (currentAmount.isEmpty ||
-                                                          currentAmount == '0' ||
-                                                          currentAmount == '0.0' ||
-                                                          currentAmount == '0.00') {
-                                                        currentAmount = vehicle['amount']?.toString() ?? '0';
+                                                      currentAmount =
+                                                          await UniversalPrintHelper.getPrintAmountFromAPI(
+                                                            bId,
+                                                          ).timeout(
+                                                            const Duration(
+                                                              seconds: 10,
+                                                            ),
+                                                          );
+                                                      if (currentAmount
+                                                              .isEmpty ||
+                                                          currentAmount ==
+                                                              '0' ||
+                                                          currentAmount ==
+                                                              '0.0' ||
+                                                          currentAmount ==
+                                                              '0.00') {
+                                                        currentAmount =
+                                                            vehicle['amount']
+                                                                ?.toString() ??
+                                                            '0';
                                                       }
                                                     } catch (_) {
-                                                      currentAmount = vehicle['amount']?.toString() ?? '0';
+                                                      currentAmount =
+                                                          vehicle['amount']
+                                                              ?.toString() ??
+                                                          '0';
                                                     }
                                                     await UniversalPrintHelper.printTicket(
                                                       context: context,
@@ -2035,12 +2073,12 @@ class _vSearchScreenState extends State<vSearchScreen>
                                             const SizedBox(height: 10),
                                             Padding(
                                               padding: const EdgeInsets.only(
-                                                top: 8.0,
+                                                top: 14.0,
                                               ),
                                               child: Row(
                                                 children: [
                                                   Text(
-                                                    'Parking Schedule: ',
+                                                    'Parking From: ',
                                                     style: GoogleFonts.poppins(
                                                       fontSize: 14,
                                                       fontWeight:
@@ -2099,22 +2137,162 @@ class _vSearchScreenState extends State<vSearchScreen>
                                               vehicle['subsctiptiontype']
                                                   ?.toString(),
                                             ))
-                                          Row(
-                                            children: [
-                                              Text(
-                                                'Payable Time: ',
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.bold,
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 4.0),
+                                            child: Row(
+                                              children: [
+                                                Text(
+                                                  'Payable Time: ',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
-                                              ),
-                                              Text(
-                                                formattedPayableDuration,
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 14,
+                                                Text(
+                                                  formattedPayableDuration,
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 14,
+                                                  ),
                                                 ),
-                                              ),
-                                            ],
+                                              ],
+                                            ),
+                                          ),
+                                        if (!isSubscriptionSts(
+                                              vehicle['sts']?.toString(),
+                                            ) &&
+                                            !isSubscriptionSts(
+                                              vehicle['subsctiptiontype']
+                                                  ?.toString(),
+                                            ) &&
+                                            _selectedTabIndex == 0)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 0.0,
+                                              bottom: 8.0,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Text(
+                                                  'Payment Mode: ',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.black,
+                                                  ),
+                                                ),
+                                                Radio<String>(
+                                                  value: 'Online',
+                                                  groupValue:
+                                                      _paymentModes[vehicle['_id']
+                                                              ?.toString() ??
+                                                          vehicle['id']
+                                                              ?.toString() ??
+                                                          ''] ??
+                                                      'Online',
+                                                  activeColor: Colors.green,
+                                                  materialTapTargetSize:
+                                                      MaterialTapTargetSize
+                                                          .shrinkWrap,
+                                                  visualDensity:
+                                                      const VisualDensity(
+                                                        horizontal: -4,
+                                                        vertical: -4,
+                                                      ),
+                                                  onChanged: (value) {
+                                                    setState(() {
+                                                      _paymentModes[vehicle['_id']
+                                                                  ?.toString() ??
+                                                              vehicle['id']
+                                                                  ?.toString() ??
+                                                              ''] =
+                                                          value!;
+                                                    });
+                                                  },
+                                                ),
+                                                Text(
+                                                  'Online',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 12,
+                                                    color:
+                                                        (_paymentModes[vehicle['_id']
+                                                                            ?.toString() ??
+                                                                        vehicle['id']
+                                                                            ?.toString() ??
+                                                                        ''] ??
+                                                                    'Online') ==
+                                                                'Online'
+                                                            ? Colors.green
+                                                            : Colors.black,
+                                                    fontWeight:
+                                                        (_paymentModes[vehicle['_id']
+                                                                            ?.toString() ??
+                                                                        vehicle['id']
+                                                                            ?.toString() ??
+                                                                        ''] ??
+                                                                    'Online') ==
+                                                                'Online'
+                                                            ? FontWeight.bold
+                                                            : FontWeight.normal,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Radio<String>(
+                                                  value: 'Cash',
+                                                  groupValue:
+                                                      _paymentModes[vehicle['_id']
+                                                              ?.toString() ??
+                                                          vehicle['id']
+                                                              ?.toString() ??
+                                                          ''] ??
+                                                      'Online',
+                                                  activeColor: Colors.green,
+                                                  materialTapTargetSize:
+                                                      MaterialTapTargetSize
+                                                          .shrinkWrap,
+                                                  visualDensity:
+                                                      const VisualDensity(
+                                                        horizontal: -4,
+                                                        vertical: -4,
+                                                      ),
+                                                  onChanged: (value) {
+                                                    setState(() {
+                                                      _paymentModes[vehicle['_id']
+                                                                  ?.toString() ??
+                                                              vehicle['id']
+                                                                  ?.toString() ??
+                                                              ''] =
+                                                          value!;
+                                                    });
+                                                  },
+                                                ),
+                                                Text(
+                                                  'Cash',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 12,
+                                                    color:
+                                                        (_paymentModes[vehicle['_id']
+                                                                            ?.toString() ??
+                                                                        vehicle['id']
+                                                                            ?.toString() ??
+                                                                        ''] ??
+                                                                    'Online') ==
+                                                                'Cash'
+                                                            ? Colors.green
+                                                            : Colors.black,
+                                                    fontWeight:
+                                                        (_paymentModes[vehicle['_id']
+                                                                            ?.toString() ??
+                                                                        vehicle['id']
+                                                                            ?.toString() ??
+                                                                        ''] ??
+                                                                    'Online') ==
+                                                                'Cash'
+                                                            ? FontWeight.bold
+                                                            : FontWeight.normal,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         if (isSubscriptionSts(
                                               vehicle['sts']?.toString(),
@@ -2146,7 +2324,6 @@ class _vSearchScreenState extends State<vSearchScreen>
                                           mainAxisAlignment:
                                               MainAxisAlignment.start,
                                           children: [
-                                            Container(height: 10),
                                             if (vehicle['status']
                                                     .toString()
                                                     .toLowerCase() ==
@@ -2165,6 +2342,8 @@ class _vSearchScreenState extends State<vSearchScreen>
                             ],
                           ),
                         ),
+                        // Add empty space at the bottom of the column so the green "Booking on" banner can peek through!
+                        const SizedBox(height: 25),
                       ],
                     ),
                   ],

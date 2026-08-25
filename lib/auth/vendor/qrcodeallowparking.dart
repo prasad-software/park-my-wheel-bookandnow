@@ -363,7 +363,9 @@ class _qrcodeallowparkState extends State<qrcodeallowpark>
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => vendorChooseParkingPage(vendorid: widget.vendorid),
+                builder:
+                    (context) =>
+                        vendorChooseParkingPage(vendorid: widget.vendorid),
               ),
             );
           },
@@ -489,6 +491,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
   bool isLoading = true;
   String? errorMessage;
   DateTime today = DateTime.now();
+  String selectedPaymentMode = 'Online';
   DateTime? parkingDate;
   bool isTodayParking = false;
   bool _locationDenied = false;
@@ -1164,263 +1167,242 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (_vendor != null) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 8.0,
+                  ),
+                  child: Builder(
+                    builder: (context) {
+                      final parkedDate =
+                          bookingDetails?['parkedDate'] ??
+                          bookingDetails?['parkingDate'] ??
+                          '';
+                      final parkedTime =
+                          bookingDetails?['parkedTime'] ??
+                          bookingDetails?['parkingTime'] ??
+                          '';
+                      DateTime parsedDate = DateTime.now();
+                      if (parkedDate.isNotEmpty && parkedTime.isNotEmpty) {
+                        try {
+                          parsedDate =
+                              UniversalPrintHelper.tryParseDateTime(
+                                date: parkedDate,
+                                time: parkedTime,
+                              ) ??
+                              DateTime.now();
+                        } catch (e) {}
+                      }
+                      var duration = DateTime.now().difference(parsedDate);
+                      if (duration.isNegative) duration = Duration.zero;
 
+                      String twoDigits(int n) => n.toString().padLeft(2, "0");
+                      String formattedDuration =
+                          "${twoDigits(duration.inHours)}:${twoDigits(duration.inMinutes.remainder(60))}:${twoDigits(duration.inSeconds.remainder(60))}";
 
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8.0,
-                        vertical: 8.0,
-                      ),
-                      child: Builder(
-                        builder: (context) {
-                          final parkedDate =
-                              bookingDetails?['parkedDate'] ??
-                              bookingDetails?['parkingDate'] ??
-                              '';
-                          final parkedTime =
-                              bookingDetails?['parkedTime'] ??
-                              bookingDetails?['parkingTime'] ??
-                              '';
-                          DateTime parsedDate = DateTime.now();
-                          if (parkedDate.isNotEmpty && parkedTime.isNotEmpty) {
-                            try {
-                              parsedDate =
-                                  UniversalPrintHelper.tryParseDateTime(
-                                    date: parkedDate,
-                                    time: parkedTime,
-                                  ) ??
-                                  DateTime.now();
-                            } catch (e) {}
-                          }
-                          var duration = DateTime.now().difference(parsedDate);
-                          if (duration.isNegative) duration = Duration.zero;
+                      String daySuffix(int day) {
+                        if (day >= 11 && day <= 13) return 'th';
+                        switch (day % 10) {
+                          case 1:
+                            return 'st';
+                          case 2:
+                            return 'nd';
+                          case 3:
+                            return 'rd';
+                          default:
+                            return 'th';
+                        }
+                      }
 
-                          String twoDigits(int n) =>
-                              n.toString().padLeft(2, "0");
-                          String formattedDuration =
-                              "${twoDigits(duration.inHours)}:${twoDigits(duration.inMinutes.remainder(60))}:${twoDigits(duration.inSeconds.remainder(60))}";
+                      const monthNames = [
+                        "",
+                        "January",
+                        "February",
+                        "March",
+                        "April",
+                        "May",
+                        "June",
+                        "July",
+                        "August",
+                        "September",
+                        "October",
+                        "November",
+                        "December",
+                      ];
+                      String hourStr =
+                          parsedDate.hour > 12
+                              ? (parsedDate.hour - 12).toString().padLeft(
+                                2,
+                                '0',
+                              )
+                              : (parsedDate.hour == 0
+                                  ? '12'
+                                  : parsedDate.hour.toString().padLeft(2, '0'));
+                      String minuteStr = parsedDate.minute.toString().padLeft(
+                        2,
+                        '0',
+                      );
+                      String period = parsedDate.hour >= 12 ? 'PM' : 'AM';
+                      String formattedDate =
+                          "${parsedDate.day}${daySuffix(parsedDate.day)} ${monthNames[parsedDate.month]} ${parsedDate.year}, $hourStr:$minuteStr $period";
 
-                          String daySuffix(int day) {
-                            if (day >= 11 && day <= 13) return 'th';
-                            switch (day % 10) {
-                              case 1:
-                                return 'st';
-                              case 2:
-                                return 'nd';
-                              case 3:
-                                return 'rd';
-                              default:
-                                return 'th';
-                            }
-                          }
-
-                          const monthNames = [
-                            "",
-                            "January",
-                            "February",
-                            "March",
-                            "April",
-                            "May",
-                            "June",
-                            "July",
-                            "August",
-                            "September",
-                            "October",
-                            "November",
-                            "December",
-                          ];
-                          String hourStr =
-                              parsedDate.hour > 12
-                                  ? (parsedDate.hour - 12).toString().padLeft(
-                                    2,
-                                    '0',
-                                  )
-                                  : (parsedDate.hour == 0
-                                      ? '12'
-                                      : parsedDate.hour.toString().padLeft(
-                                        2,
-                                        '0',
-                                      ));
-                          String minuteStr = parsedDate.minute
-                              .toString()
-                              .padLeft(2, '0');
-                          String period = parsedDate.hour >= 12 ? 'PM' : 'AM';
-                          String formattedDate =
-                              "${parsedDate.day}${daySuffix(parsedDate.day)} ${monthNames[parsedDate.month]} ${parsedDate.year}, $hourStr:$minuteStr $period";
-
-                          return Column(
-                            children: [
-                              SizedBox(
-                                height: 100,
-                                child: Stack(
-                                  children: [
-                                    Positioned(
-                                      left: 0,
-                                      top: 30,
-                                      right: 0,
-                                      bottom: 0,
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: ColorUtils.primarycolor(),
-                                          borderRadius: const BorderRadius.only(
-                                            bottomLeft: Radius.circular(30),
-                                            bottomRight: Radius.circular(30),
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(
-                                                0.1,
-                                              ),
-                                              spreadRadius: 1,
-                                              blurRadius: 2,
-                                              offset: const Offset(0, 3),
-                                            ),
-                                          ],
+                      return Column(
+                        children: [
+                          SizedBox(
+                            height: 125,
+                            child: Stack(
+                              children: [
+                                Positioned(
+                                  left: 0,
+                                  top: 30,
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: ColorUtils.primarycolor(),
+                                      borderRadius: const BorderRadius.only(
+                                        bottomLeft: Radius.circular(30),
+                                        bottomRight: Radius.circular(30),
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.1),
+                                          spreadRadius: 1,
+                                          blurRadius: 2,
+                                          offset: const Offset(0, 3),
                                         ),
-                                        alignment: Alignment.bottomCenter,
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(5.0),
-                                          child: Text(
-                                            'Booking on : $formattedDate',
-                                            style: GoogleFonts.poppins(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                            ),
-                                          ),
+                                      ],
+                                    ),
+                                    alignment: Alignment.bottomCenter,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(5.0),
+                                      child: Text(
+                                        'Booked On : $formattedDate',
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
                                         ),
                                       ),
                                     ),
-                                    Column(
-                                      children: [
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey[200],
-                                            borderRadius:
-                                                const BorderRadius.only(
-                                                  topLeft: Radius.circular(5),
-                                                  topRight: Radius.circular(5),
-                                                  bottomLeft: Radius.circular(
-                                                    20,
-                                                  ),
-                                                  bottomRight: Radius.circular(
-                                                    20,
-                                                  ),
-                                                ),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withOpacity(
-                                                  0.1,
-                                                ),
-                                                spreadRadius: 1,
-                                                blurRadius: 2,
-                                                offset: const Offset(0, 3),
-                                              ),
-                                            ],
+                                  ),
+                                ),
+                                Column(
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[200],
+                                        borderRadius: const BorderRadius.only(
+                                          topLeft: Radius.circular(5),
+                                          topRight: Radius.circular(5),
+                                          bottomLeft: Radius.circular(20),
+                                          bottomRight: Radius.circular(20),
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.1,
+                                            ),
+                                            spreadRadius: 1,
+                                            blurRadius: 2,
+                                            offset: const Offset(0, 3),
                                           ),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.only(
-                                                  left: 14,
-                                                  top: 2,
-                                                  right: 0.0,
-                                                  bottom: 0.0,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  border: Border(
-                                                    bottom: BorderSide(
-                                                      color:
-                                                          ColorUtils.primarycolor(),
-                                                      width: 0.5,
-                                                    ),
-                                                  ),
-                                                  borderRadius:
-                                                      const BorderRadius.only(
-                                                        topLeft:
-                                                            Radius.circular(
-                                                              5.0,
-                                                            ),
-                                                        topRight:
-                                                            Radius.circular(
-                                                              5.0,
-                                                            ),
-                                                      ),
-                                                  color: Colors.grey[200],
-                                                ),
-                                                child: Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
-                                                  children: [
-                                                    Text(
-                                                      bookingDetails?['vehicleNumber'] ??
-                                                          'Unknown',
-                                                      style: GoogleFonts.poppins(
-                                                        fontSize: 14,
-                                                        color:
-                                                            ColorUtils.primarycolor(),
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 0),
-                                                  ],
+                                        ],
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.only(
+                                              left: 14,
+                                              top: 2,
+                                              right: 0.0,
+                                              bottom: 0.0,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              border: Border(
+                                                bottom: BorderSide(
+                                                  color:
+                                                      ColorUtils.primarycolor(),
+                                                  width: 0.5,
                                                 ),
                                               ),
-                                              Row(
-                                                children: [
-                                                  Padding(
-                                                    padding:
-                                                        const EdgeInsets.all(
-                                                          5.0,
-                                                        ),
-                                                    child: Container(
-                                                      height: 40,
-                                                      width: 40,
-                                                      decoration: BoxDecoration(
-                                                        color:
-                                                            ColorUtils.primarycolor(),
-                                                        borderRadius:
-                                                            const BorderRadius.all(
-                                                              Radius.circular(
-                                                                20,
-                                                              ),
-                                                            ),
-                                                      ),
-                                                      child: const Icon(
-                                                        Icons.directions_car,
-                                                        color: Colors.white,
-                                                      ),
+                                              borderRadius:
+                                                  const BorderRadius.only(
+                                                    topLeft: Radius.circular(
+                                                      5.0,
+                                                    ),
+                                                    topRight: Radius.circular(
+                                                      5.0,
                                                     ),
                                                   ),
-                                                  const SizedBox(width: 10),
-                                                  Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      RichText(
-                                                        text: TextSpan(
+                                              color: Colors.grey[200],
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Text(
+                                                  bookingDetails?['vehicleNumber'] ??
+                                                      'Unknown',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 14,
+                                                    color:
+                                                        ColorUtils.primarycolor(),
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 0),
+                                              ],
+                                            ),
+                                          ),
+                                          Row(
+                                            children: [
+                                              Padding(
+                                                padding: const EdgeInsets.all(
+                                                  5.0,
+                                                ),
+                                                child: Container(
+                                                  height: 40,
+                                                  width: 40,
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        ColorUtils.primarycolor(),
+                                                    borderRadius:
+                                                        const BorderRadius.all(
+                                                          Radius.circular(20),
+                                                        ),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.directions_car,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  RichText(
+                                                    text: TextSpan(
+                                                      text:
+                                                          'Parking From: ',
+                                                      style:
+                                                          GoogleFonts.poppins(
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: Colors.black,
+                                                          ),
+                                                      children: [
+                                                        TextSpan(
                                                           text:
-                                                              'Parking Schedule: ',
+                                                              '${bookingDetails?['parkingDate'] ?? ''} ${bookingDetails?['parkingTime'] ?? ''}',
                                                           style:
                                                               GoogleFonts.poppins(
-                                                                fontSize: 14,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                                color:
-                                                                    Colors
-                                                                        .black,
-                                                              ),
-                                                          children: [
-                                                            TextSpan(
-                                                              text:
-                                                                  '${bookingDetails?['parkingDate'] ?? ''} ${bookingDetails?['parkingTime'] ?? ''}',
-                                                              style: GoogleFonts.poppins(
                                                                 fontSize: 13,
                                                                 fontWeight:
                                                                     FontWeight
@@ -1429,39 +1411,90 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                                                                     Colors
                                                                         .black,
                                                               ),
-                                                            ),
-                                                          ],
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 5),
+                                                  RichText(
+                                                    text: TextSpan(
+                                                      text: 'Payable Time: ',
+                                                      style:
+                                                          GoogleFonts.poppins(
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: Colors.black,
+                                                          ),
+                                                      children: [
+                                                        TextSpan(
+                                                          text:
+                                                              formattedDuration,
+                                                          style:
+                                                              GoogleFonts.poppins(
+                                                                fontSize: 13,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .normal,
+                                                                color:
+                                                                    Colors
+                                                                        .black,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 0),
+                                                  Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Text(
+                                                        'Payment Mode:',
+                                                        style: GoogleFonts.poppins(
+                                                          fontSize: 14,
+                                                          fontWeight: FontWeight.bold,
                                                         ),
                                                       ),
-                                                      RichText(
-                                                        text: TextSpan(
-                                                          text:
-                                                              'Payable Time: ',
-                                                          style:
-                                                              GoogleFonts.poppins(
-                                                                fontSize: 14,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                                color:
-                                                                    Colors
-                                                                        .black,
-                                                              ),
-                                                          children: [
-                                                            TextSpan(
-                                                              text:
-                                                                  formattedDuration,
-                                                              style: GoogleFonts.poppins(
-                                                                fontSize: 13,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .normal,
-                                                                color:
-                                                                    Colors
-                                                                        .black,
-                                                              ),
-                                                            ),
-                                                          ],
+                                                      const SizedBox(width: 5),
+                                                      Radio<String>(
+                                                        value: 'Online',
+                                                        groupValue: selectedPaymentMode,
+                                                        onChanged: (value) {
+                                                          setState(() {
+                                                            selectedPaymentMode = value!;
+                                                          });
+                                                        },
+                                                        activeColor: ColorUtils.primarycolor(),
+                                                        visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
+                                                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                      ),
+                                                      Text(
+                                                        'Online',
+                                                        style: GoogleFonts.poppins(
+                                                          fontSize: 12,
+                                                          fontWeight: selectedPaymentMode == 'Online' ? FontWeight.bold : FontWeight.normal,
+                                                          color: selectedPaymentMode == 'Online' ? ColorUtils.primarycolor() : null,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 15),
+                                                      Radio<String>(
+                                                        value: 'Cash',
+                                                        groupValue: selectedPaymentMode,
+                                                        onChanged: (value) {
+                                                          setState(() {
+                                                            selectedPaymentMode = value!;
+                                                          });
+                                                        },
+                                                        activeColor: ColorUtils.primarycolor(),
+                                                        visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
+                                                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                      ),
+                                                      Text(
+                                                        'Cash',
+                                                        style: GoogleFonts.poppins(
+                                                          fontSize: 12,
+                                                          fontWeight: selectedPaymentMode == 'Cash' ? FontWeight.bold : FontWeight.normal,
+                                                          color: selectedPaymentMode == 'Cash' ? ColorUtils.primarycolor() : null,
                                                         ),
                                                       ),
                                                     ],
@@ -1470,238 +1503,41 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                                               ),
                                             ],
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
-                              ),
+                              ],
+                            ),
+                          ),
 
-                              if (bookingDetails != null &&
-                                  bookingDetails!['status'] == 'PARKED' &&
-                                  bookingDetails!['vendorId'].toString() ==
-                                      widget.vendorid)
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    top: 20,
-                                    left: 10,
-                                    right: 10,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      if (bookingDetails!['sts']?.toString() ==
-                                          'Instant')
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            bottom: 15,
-                                          ),
-                                          child: ElevatedButton(
-                                            onPressed:
-                                                _isExiting
-                                                    ? null
-                                                    : () => _handlePrintAndExit(
-                                                      bookingDetails!,
-                                                    ),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.white,
-                                              foregroundColor:
-                                                  ColorUtils.primarycolor(),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 18,
-                                                  ),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    const BorderRadius.all(
-                                                      Radius.circular(5),
-                                                    ),
-                                                side: BorderSide(
-                                                  color:
-                                                      ColorUtils.primarycolor(),
-                                                  width: 0.5,
-                                                ),
-                                              ),
-                                            ),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                if (_isExiting)
-                                                  SizedBox(
-                                                    width: 14,
-                                                    height: 14,
-                                                    child: CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      valueColor:
-                                                          AlwaysStoppedAnimation<
-                                                            Color
-                                                          >(
-                                                            ColorUtils.primarycolor(),
-                                                          ),
-                                                    ),
-                                                  )
-                                                else
-                                                  const Icon(
-                                                    Icons.check_circle_outline,
-                                                    color: Colors.black,
-                                                    size: 24,
-                                                  ),
-                                                const SizedBox(width: 10),
-                                                Text(
-                                                  _isExiting
-                                                      ? 'Processing...'
-                                                      : 'Print & Exit',
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: 18,
-                                                    fontWeight: FontWeight.bold,
-                                                    color:
-                                                        ColorUtils.primarycolor(),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 15,
-                                        ),
-                                        child: ElevatedButton(
-                                          onPressed:
-                                              (_isCheckingExit || _isExiting)
-                                                  ? null
-                                                  : () =>
-                                                      _handleExitButtonPressed(
-                                                        bookingDetails!,
-                                                      ),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.white,
-                                            foregroundColor: Colors.green,
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 18,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  const BorderRadius.all(
-                                                    Radius.circular(5),
-                                                  ),
-                                              side: BorderSide(
-                                                color:
-                                                    ColorUtils.primarycolor(),
-                                                width: 0.5,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              if (_isCheckingExit)
-                                                SizedBox(
-                                                  width: 14,
-                                                  height: 14,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    valueColor:
-                                                        AlwaysStoppedAnimation<
-                                                          Color
-                                                        >(
-                                                          ColorUtils.primarycolor(),
-                                                        ),
-                                                  ),
-                                                )
-                                              else
-                                                const Icon(
-                                                  Icons.qr_code_scanner,
-                                                  color: Colors.green,
-                                                  size: 24,
-                                                ),
-                                              const SizedBox(width: 10),
-                                              Text(
-                                                _isCheckingExit
-                                                    ? 'Checking...'
-                                                    : 'Exit',
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.red,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
+                          if (bookingDetails != null &&
+                              bookingDetails!['status'] == 'PARKED' &&
+                              bookingDetails!['vendorId'].toString() ==
+                                  widget.vendorid)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                top: 20,
+                                left: 10,
+                                right: 10,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (bookingDetails!['sts']?.toString() ==
+                                      'Instant')
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 15,
                                       ),
-                                      ElevatedButton(
-                                        onPressed: () async {
-                                          final String bId =
-                                              bookingDetails!['_id']
-                                                  ?.toString() ??
-                                              '';
-                                          if (bId.isEmpty) return;
-                                          String currentAmount = '0';
-                                          try {
-                                            currentAmount =
-                                                await UniversalPrintHelper.getPrintAmountFromAPI(
-                                                  bId,
-                                                );
-                                            if (currentAmount.isEmpty || currentAmount == '0' || currentAmount == '0.0' || currentAmount == '0.00') {
-                                              currentAmount = bookingDetails!['amount']?.toString() ?? '0';
-                                            }
-                                          } catch (_) {
-                                            currentAmount = bookingDetails!['amount']?.toString() ?? '0';
-                                          }
-                                          await UniversalPrintHelper.printTicket(
-                                            context: context,
-                                            vendorName:
-                                                bookingDetails!['vendorName'] ??
-                                                'Vendor',
-                                            bookingId: bId,
-                                            invoiceId:
-                                                bookingDetails!['invoiceId']
-                                                    ?.toString(),
-                                            vehicleType:
-                                                bookingDetails!['vehicleType'] ??
-                                                '',
-                                            vehicleNumber:
-                                                bookingDetails!['vehicleNumber'] ??
-                                                '',
-                                            parkingDate:
-                                                bookingDetails!['parkingDate'] ??
-                                                '',
-                                            parkingTime:
-                                                bookingDetails!['parkingTime'] ??
-                                                '',
-                                            amount: currentAmount,
-                                            personName:
-                                                bookingDetails!['userName'] ??
-                                                bookingDetails!['personName'] ??
-                                                '',
-                                            valetCharge:
-                                                double.tryParse(
-                                                  bookingDetails!['valetCharge']
-                                                          ?.toString() ??
-                                                      '0',
-                                                ) ??
-                                                0.0,
-                                            mobileNumber:
-                                                bookingDetails!['mobileNumber'] ??
-                                                '',
-                                            vendorId:
-                                                bookingDetails!['vendorId']
-                                                    ?.toString() ??
-                                                widget.vendorid,
-                                            bookType:
-                                                bookingDetails!['bookingType'] ??
-                                                bookingDetails!['bookType'] ??
-                                                '',
-                                            sts:
-                                                bookingDetails!['sts']
-                                                    ?.toString() ??
-                                                '',
-                                          );
-                                        },
+                                      child: ElevatedButton(
+                                        onPressed:
+                                            _isExiting
+                                                ? null
+                                                : () => _handlePrintAndExit(
+                                                  bookingDetails!,
+                                                ),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.white,
                                           foregroundColor:
@@ -1724,14 +1560,31 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                                           mainAxisAlignment:
                                               MainAxisAlignment.center,
                                           children: [
-                                            const Icon(
-                                              Icons.print,
-                                              color: Colors.black,
-                                              size: 24,
-                                            ),
+                                            if (_isExiting)
+                                              SizedBox(
+                                                width: 14,
+                                                height: 14,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(
+                                                        ColorUtils.primarycolor(),
+                                                      ),
+                                                ),
+                                              )
+                                            else
+                                              const Icon(
+                                                Icons.check_circle_outline,
+                                                color: Colors.black,
+                                                size: 24,
+                                              ),
                                             const SizedBox(width: 10),
                                             Text(
-                                              'Print',
+                                              _isExiting
+                                                  ? 'Processing...'
+                                                  : 'Print & Exit',
                                               style: GoogleFonts.poppins(
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
@@ -1742,20 +1595,200 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                                           ],
                                         ),
                                       ),
-                                    ],
+                                    ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 15),
+                                    child: ElevatedButton(
+                                      onPressed:
+                                          (_isCheckingExit || _isExiting)
+                                              ? null
+                                              : () => _handleExitButtonPressed(
+                                                bookingDetails!,
+                                              ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.white,
+                                        foregroundColor: Colors.green,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 18,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: const BorderRadius.all(
+                                            Radius.circular(5),
+                                          ),
+                                          side: BorderSide(
+                                            color: ColorUtils.primarycolor(),
+                                            width: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          if (_isCheckingExit)
+                                            SizedBox(
+                                              width: 14,
+                                              height: 14,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                      Color
+                                                    >(
+                                                      ColorUtils.primarycolor(),
+                                                    ),
+                                              ),
+                                            )
+                                          else
+                                            const Icon(
+                                              Icons.qr_code_scanner,
+                                              color: Colors.green,
+                                              size: 24,
+                                            ),
+                                          const SizedBox(width: 10),
+                                          Text(
+                                            _isCheckingExit
+                                                ? 'Checking...'
+                                                : 'Exit',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      final String bId =
+                                          bookingDetails!['_id']?.toString() ??
+                                          '';
+                                      if (bId.isEmpty) return;
+                                      String currentAmount = '0';
+                                      try {
+                                        currentAmount =
+                                            await UniversalPrintHelper.getPrintAmountFromAPI(
+                                              bId,
+                                            );
+                                        if (currentAmount.isEmpty ||
+                                            currentAmount == '0' ||
+                                            currentAmount == '0.0' ||
+                                            currentAmount == '0.00') {
+                                          currentAmount =
+                                              bookingDetails!['amount']
+                                                  ?.toString() ??
+                                              '0';
+                                        }
+                                      } catch (_) {
+                                        currentAmount =
+                                            bookingDetails!['amount']
+                                                ?.toString() ??
+                                            '0';
+                                      }
+                                      await UniversalPrintHelper.printTicket(
+                                        context: context,
+                                        vendorName:
+                                            bookingDetails!['vendorName'] ??
+                                            'Vendor',
+                                        bookingId: bId,
+                                        invoiceId:
+                                            bookingDetails!['invoiceId']
+                                                ?.toString(),
+                                        vehicleType:
+                                            bookingDetails!['vehicleType'] ??
+                                            '',
+                                        vehicleNumber:
+                                            bookingDetails!['vehicleNumber'] ??
+                                            '',
+                                        parkingDate:
+                                            bookingDetails!['parkingDate'] ??
+                                            '',
+                                        parkingTime:
+                                            bookingDetails!['parkingTime'] ??
+                                            '',
+                                        amount: currentAmount,
+                                        personName:
+                                            bookingDetails!['userName'] ??
+                                            bookingDetails!['personName'] ??
+                                            '',
+                                        valetCharge:
+                                            double.tryParse(
+                                              bookingDetails!['valetCharge']
+                                                      ?.toString() ??
+                                                  '0',
+                                            ) ??
+                                            0.0,
+                                        mobileNumber:
+                                            bookingDetails!['mobileNumber'] ??
+                                            '',
+                                        vendorId:
+                                            bookingDetails!['vendorId']
+                                                ?.toString() ??
+                                            widget.vendorid,
+                                        bookType:
+                                            bookingDetails!['bookingType'] ??
+                                            bookingDetails!['bookType'] ??
+                                            '',
+                                        sts:
+                                            bookingDetails!['sts']
+                                                ?.toString() ??
+                                            '',
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor:
+                                          ColorUtils.primarycolor(),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 18,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: const BorderRadius.all(
+                                          Radius.circular(5),
+                                        ),
+                                        side: BorderSide(
+                                          color: ColorUtils.primarycolor(),
+                                          width: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(
+                                          Icons.print,
+                                          color: Colors.black,
+                                          size: 24,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Text(
+                                          'Print',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: ColorUtils.primarycolor(),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
 
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8.0, right: 8.0),
-                      child: Column(
-                        children: [
-                          /*
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0, right: 8.0),
+                  child: Column(
+                    children: [
+                      /*
                         const SizedBox(height: 15),
                         Container(
                           decoration: BoxDecoration(
@@ -1870,269 +1903,264 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                           ),
                         ),
       */
-                          const SizedBox(height: 8),
-                          if (amenities.isNotEmpty) ...[
-                            Container(
-                              decoration: BoxDecoration(
-                                color:
-                                    Colors
-                                        .white, // Move color inside decoration
-                                borderRadius: BorderRadius.circular(
-                                  5,
-                                ), // Set border radius
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    spreadRadius: 1,
-                                    blurRadius: 2,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
+                      const SizedBox(height: 8),
+                      if (amenities.isNotEmpty) ...[
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white, // Move color inside decoration
+                            borderRadius: BorderRadius.circular(
+                              5,
+                            ), // Set border radius
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                spreadRadius: 1,
+                                blurRadius: 2,
+                                offset: const Offset(0, 3),
                               ),
-                              child: Column(
-                                children: [
-                                  const SizedBox(height: 5),
-                                  Container(
-                                    color: Colors.white,
-                                    child: Align(
-                                      alignment:
-                                          Alignment
-                                              .center, // Aligns content to the left
-                                      child: Text(
-                                        "Facilities",
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          // decoration: TextDecoration.underline, // Add underline here
-                                          decorationColor:
-                                              Colors
-                                                  .black, // Optional: Set the color of the underline
-                                          // Optional: Set the thickness of the underline
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Divider(
-                                    thickness:
-                                        0.5, // Set the thickness of the divider
-                                    color:
-                                        ColorUtils.primarycolor(), // Set the color of the divider
-                                  ),
-                                  //
-                                  Padding(
-                                    padding: const EdgeInsets.all(5.0),
-                                    child: Wrap(
-                                      spacing: 6.0,
-                                      runSpacing: 6.0,
-                                      children:
-                                          amenities.map((amenity) {
-                                            return Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 4,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                // color:  ColorUtils.primarycolor() ,
-                                                borderRadius:
-                                                    BorderRadius.circular(5),
-                                                border: Border.all(
-                                                  color:
-                                                      Colors
-                                                          .black, // Set the color of the border
-                                                  width:
-                                                      0.5, // Set the width of the border
-                                                ),
-                                                boxShadow: const [
-                                                  // BoxShadow(
-                                                  //   color: Colors.black26,
-                                                  //   blurRadius: 4.0,
-                                                  //   offset: Offset(0, 2),
-                                                  // ),
-                                                ],
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    _getAmenityIcon(amenity),
-                                                    size: 12,
-                                                    color: Colors.black,
-                                                  ),
-                                                  const SizedBox(width: 5),
-                                                  Text(
-                                                    amenity,
-                                                    style: GoogleFonts.poppins(
-                                                      color: Colors.black,
-                                                      fontSize: 12,
-                                                      // fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          }).toList(),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 5),
-                                ],
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 8),
-                          if (services.isNotEmpty) ...[
-                            Container(
-                              decoration: BoxDecoration(
-                                color:
-                                    Colors
-                                        .white, // Move color inside decoration
-                                borderRadius: BorderRadius.circular(
-                                  5,
-                                ), // Set border radius
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    spreadRadius: 1,
-                                    blurRadius: 2,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                children: [
-                                  Container(
-                                    color: Colors.white,
-                                    child: Align(
-                                      alignment:
-                                          Alignment
-                                              .center, // Aligns content to the left
-                                      child: Text(
-                                        "Additional Services",
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          // decoration: TextDecoration.underline, // Add underline here
-                                          decorationColor:
-                                              Colors
-                                                  .black, // Optional: Set the color of the underline
-                                          // Optional: Set the thickness of the underline
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Divider(
-                                    thickness:
-                                        0.5, // Set the thickness of the divider
-                                    color:
-                                        ColorUtils.primarycolor(), // Set the color of the divider
-                                  ),
-                                  const SizedBox(height: 8),
-                                  // Heading Card
-
-                                  // Loop through the services list
-                                  Wrap(
-                                    spacing: 6.0,
-                                    runSpacing: 6.0,
-                                    children:
-                                        services.asMap().entries.map((entry) {
-                                          final s = entry.value;
-
-                                          return Container(
-                                            // width: 100, // Adjust width as needed
-                                            padding: const EdgeInsets.all(5.0),
-                                            decoration: BoxDecoration(
-                                              border: Border.all(
-                                                color: Colors.black,
-                                                width: 0.5,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(8.0),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  s.type,
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: 12,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                  softWrap: true,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                                Text(
-                                                  ": ₹${s.amount}",
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: 12,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        }).toList(),
-                                  ),
-
-                                  const SizedBox(height: 8),
-                                ],
-                              ),
-                            ),
-                          ],
-                          // Google Map removed as per request
-                          const SizedBox(height: 10),
-
-                          // Parse booking parking date (adjust format if needed)
-                          if (bookingDetails != null &&
-                              (bookingDetails!['status'] == 'PENDING' ||
-                                  bookingDetails!['status'] == 'Approved') &&
-                              bookingDetails!['vendorId'].toString() ==
-                                  widget.vendorid &&
-                              isTodayParking)
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                                child: ElevatedButton.icon(
-                                  onPressed: () async {
-                                    await _allowParking();
-                                  },
-                                  label: Text(
-                                    'Allow Parking',
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 5),
+                              Container(
+                                color: Colors.white,
+                                child: Align(
+                                  alignment:
+                                      Alignment
+                                          .center, // Aligns content to the left
+                                  child: Text(
+                                    "Facilities",
                                     style: GoogleFonts.poppins(
                                       fontSize: 16,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: FontWeight.bold,
+                                      // decoration: TextDecoration.underline, // Add underline here
+                                      decorationColor:
+                                          Colors
+                                              .black, // Optional: Set the color of the underline
+                                      // Optional: Set the thickness of the underline
                                     ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: ColorUtils.primarycolor(),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 4,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    elevation: 3,
-                                    shadowColor: Colors.green.withOpacity(0.3),
-                                    animationDuration: const Duration(
-                                      milliseconds: 200,
-                                    ),
-                                    enableFeedback: true,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    minimumSize: const Size(120, 20),
                                   ),
                                 ),
                               ),
-                            ),
+                              Divider(
+                                thickness:
+                                    0.5, // Set the thickness of the divider
+                                color:
+                                    ColorUtils.primarycolor(), // Set the color of the divider
+                              ),
+                              //
+                              Padding(
+                                padding: const EdgeInsets.all(5.0),
+                                child: Wrap(
+                                  spacing: 6.0,
+                                  runSpacing: 6.0,
+                                  children:
+                                      amenities.map((amenity) {
+                                        return Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            // color:  ColorUtils.primarycolor() ,
+                                            borderRadius: BorderRadius.circular(
+                                              5,
+                                            ),
+                                            border: Border.all(
+                                              color:
+                                                  Colors
+                                                      .black, // Set the color of the border
+                                              width:
+                                                  0.5, // Set the width of the border
+                                            ),
+                                            boxShadow: const [
+                                              // BoxShadow(
+                                              //   color: Colors.black26,
+                                              //   blurRadius: 4.0,
+                                              //   offset: Offset(0, 2),
+                                              // ),
+                                            ],
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                _getAmenityIcon(amenity),
+                                                size: 12,
+                                                color: Colors.black,
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Text(
+                                                amenity,
+                                                style: GoogleFonts.poppins(
+                                                  color: Colors.black,
+                                                  fontSize: 12,
+                                                  // fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }).toList(),
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      if (services.isNotEmpty) ...[
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white, // Move color inside decoration
+                            borderRadius: BorderRadius.circular(
+                              5,
+                            ), // Set border radius
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                spreadRadius: 1,
+                                blurRadius: 2,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                color: Colors.white,
+                                child: Align(
+                                  alignment:
+                                      Alignment
+                                          .center, // Aligns content to the left
+                                  child: Text(
+                                    "Additional Services",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      // decoration: TextDecoration.underline, // Add underline here
+                                      decorationColor:
+                                          Colors
+                                              .black, // Optional: Set the color of the underline
+                                      // Optional: Set the thickness of the underline
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Divider(
+                                thickness:
+                                    0.5, // Set the thickness of the divider
+                                color:
+                                    ColorUtils.primarycolor(), // Set the color of the divider
+                              ),
+                              const SizedBox(height: 8),
+                              // Heading Card
 
-                          const SizedBox(height: 50),
-                        ],
-                      ),
-                    ),
+                              // Loop through the services list
+                              Wrap(
+                                spacing: 6.0,
+                                runSpacing: 6.0,
+                                children:
+                                    services.asMap().entries.map((entry) {
+                                      final s = entry.value;
+
+                                      return Container(
+                                        // width: 100, // Adjust width as needed
+                                        padding: const EdgeInsets.all(5.0),
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.black,
+                                            width: 0.5,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8.0,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              s.type,
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                              softWrap: true,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            Text(
+                                              ": ₹${s.amount}",
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                              ),
+
+                              const SizedBox(height: 8),
+                            ],
+                          ),
+                        ),
+                      ],
+                      // Google Map removed as per request
+                      const SizedBox(height: 10),
+
+                      // Parse booking parking date (adjust format if needed)
+                      if (bookingDetails != null &&
+                          (bookingDetails!['status'] == 'PENDING' ||
+                              bookingDetails!['status'] == 'Approved') &&
+                          bookingDetails!['vendorId'].toString() ==
+                              widget.vendorid &&
+                          isTodayParking)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                await _allowParking();
+                              },
+                              label: Text(
+                                'Allow Parking',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: ColorUtils.primarycolor(),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                elevation: 3,
+                                shadowColor: Colors.green.withOpacity(0.3),
+                                animationDuration: const Duration(
+                                  milliseconds: 200,
+                                ),
+                                enableFeedback: true,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                minimumSize: const Size(120, 20),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      const SizedBox(height: 50),
+                    ],
+                  ),
+                ),
               ],
             ],
           ),
@@ -2159,7 +2187,10 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         amountStr = await UniversalPrintHelper.getPrintAmountFromAPI(
           vehicle['_id']?.toString() ?? '',
         ).timeout(_apiTimeout);
-        if (amountStr.isEmpty || amountStr == '0' || amountStr == '0.0' || amountStr == '0.00') {
+        if (amountStr.isEmpty ||
+            amountStr == '0' ||
+            amountStr == '0.0' ||
+            amountStr == '0.00') {
           amountStr = vehicle['amount']?.toString() ?? '0';
         }
       } catch (_) {
@@ -2190,6 +2221,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                     ),
                   ),
                   child: Exitpage(
+                    paymentMode: selectedPaymentMode,
                     currentTabIndex: 0,
                     userid: vehicle['userId']?.toString() ?? '',
                     otp: vehicle['otp']?.toString() ?? '',
@@ -2237,7 +2269,10 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(
           bookingId,
         ).timeout(_apiTimeout);
-        if (currentAmount.isEmpty || currentAmount == '0' || currentAmount == '0.0' || currentAmount == '0.00') {
+        if (currentAmount.isEmpty ||
+            currentAmount == '0' ||
+            currentAmount == '0.0' ||
+            currentAmount == '0.00') {
           currentAmount = vehicle['amount']?.toString() ?? '0';
         }
       } catch (e) {
@@ -2263,6 +2298,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
           vendorId: vehicle['vendorId']?.toString() ?? widget.vendorid,
           bookType: vehicle['bookingType'] ?? vehicle['bookType'] ?? '',
           sts: vehicle['sts']?.toString() ?? '',
+          isPrintAndExit: true,
         );
       } catch (e) {
         if (mounted) {
@@ -2329,7 +2365,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       final Map<String, dynamic> requestBody = {
         'amount': parkingCharge,
         'hour': formattedDuration,
-        'paymentMode': 'Cash',
+        'paymentMode': selectedPaymentMode,
       };
 
       final userId = (vehicle['userId'] ?? '').toString().trim();

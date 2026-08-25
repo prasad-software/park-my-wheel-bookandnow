@@ -235,7 +235,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                 double.tryParse(savedValetCharge) ?? _valetChargeSetting;
           });
         }
-        
+
         setState(() {
           _isPineLabsEnabled = prefs.getBool('isPineLabsEnabled') ?? false;
         });
@@ -2101,7 +2101,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
       }
     }
 
-    if (bookingId.isNotEmpty) {
+    if (bookingId.isNotEmpty && !isPrintAndExit) {
       await SunmiPrinter.printText('\u00A0\n\u00A0'); // Extra space before QR
       await SunmiPrinter.printQRCode(
         bookingId,
@@ -2324,7 +2324,9 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
 
     if (amountStr.isEmpty || amountStr == "Amount not found") {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid amount. Cannot process payment.')),
+        const SnackBar(
+          content: Text('Invalid amount. Cannot process payment.'),
+        ),
       );
       return;
     }
@@ -2343,7 +2345,8 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
       Map<String, dynamic> payload = {
         "Detail": {
           "BillingRefNo": "PMW_${DateTime.now().millisecondsSinceEpoch}",
-          "PaymentAmount": amountInPaise, // Amount in Paise as expected by configured terminal
+          "PaymentAmount":
+              amountInPaise, // Amount in Paise as expected by configured terminal
           "TransactionType": _pinelabsPaymentMethod == 'UPI' ? 5120 : 4001,
         },
         "Header": {
@@ -2351,7 +2354,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           "MethodId": "1001",
           "UserId": "user1234",
           "VersionNo": "1.0",
-        }
+        },
       };
       String transactionData = jsonEncode(payload);
 
@@ -2360,7 +2363,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
 
       // Trigger transaction
       String result = await PlutusSmart.startTransaction(transactionData);
-      
+
       setState(() {
         _isLoading = false;
         _activeLoadingButton = '';
@@ -2368,23 +2371,28 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
 
       String responseCode = "";
       String responseMessage = result;
-      
+
       try {
         Map<String, dynamic> responseData = jsonDecode(result);
         if (responseData.containsKey('Response')) {
-          responseCode = responseData['Response']['ResponseCode']?.toString() ?? "";
-          responseMessage = responseData['Response']['ResponseMsg']?.toString() 
-                            ?? responseData['Response']['ResponseMessage']?.toString() 
-                            ?? result;
+          responseCode =
+              responseData['Response']['ResponseCode']?.toString() ?? "";
+          responseMessage =
+              responseData['Response']['ResponseMsg']?.toString() ??
+              responseData['Response']['ResponseMessage']?.toString() ??
+              result;
         } else if (responseData.containsKey('Detail')) {
-          responseCode = responseData['Detail']['ResponseCode']?.toString() ?? "";
-          responseMessage = responseData['Detail']['ResponseMessage']?.toString() ?? result;
+          responseCode =
+              responseData['Detail']['ResponseCode']?.toString() ?? "";
+          responseMessage =
+              responseData['Detail']['ResponseMessage']?.toString() ?? result;
         }
       } catch (e) {
         // Not a JSON string
       }
 
-      if (responseCode == "00") { // Indicates success
+      if (responseCode == "00") {
+        // Indicates success
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('PineLabs Payment Successful!')),
         );
@@ -2400,9 +2408,9 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         _isLoading = false;
         _activeLoadingButton = '';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error initiating payment: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error initiating payment: $e')));
     }
   }
 
@@ -3158,10 +3166,16 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                           ),
                           const SizedBox(width: 8),
                           _buildActionButton(
-                            (_isPineLabsEnabled && _paymentMode == 'Online') ? "Pay Now" : "Print and Exit",
-                            (_isPineLabsEnabled && _paymentMode == 'Online') ? Icons.payment : Icons.exit_to_app,
+                            (_isPineLabsEnabled && _paymentMode == 'Online')
+                                ? "Pay Now"
+                                : "Print and Exit",
+                            (_isPineLabsEnabled && _paymentMode == 'Online')
+                                ? Icons.payment
+                                : Icons.exit_to_app,
                             ColorUtils.primarycolor(),
-                            (_isPineLabsEnabled && _paymentMode == 'Online') ? _payNowAndPrint : _printAndExit,
+                            (_isPineLabsEnabled && _paymentMode == 'Online')
+                                ? _payNowAndPrint
+                                : _printAndExit,
                             isDisabled: !(_printEnabled && _exitEnabled),
                             // isLoading: _isLoading && _activeLoadingButton == 'printAndExit',
                           ),
@@ -3322,12 +3336,16 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                                       _buildRadioOption(
                                         "Card",
                                         _pinelabsPaymentMethod == "Card",
-                                        (v) => setState(() => _pinelabsPaymentMethod = v!),
+                                        (v) => setState(
+                                          () => _pinelabsPaymentMethod = v!,
+                                        ),
                                       ),
                                       _buildRadioOption(
                                         "UPI",
                                         _pinelabsPaymentMethod == "UPI",
-                                        (v) => setState(() => _pinelabsPaymentMethod = v!),
+                                        (v) => setState(
+                                          () => _pinelabsPaymentMethod = v!,
+                                        ),
                                       ),
                                     ],
                                   ),

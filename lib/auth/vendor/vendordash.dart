@@ -39,6 +39,8 @@ import '../../main.dart';
 import '../customer/parking/bookparking.dart';
 import 'menusscreen.dart';
 
+Map<String, String> globalSelectedPaymentModes = {};
+
 class vendordashScreen extends StatefulWidget {
   final String vendorid;
   final int? initialTabIndex;
@@ -807,7 +809,7 @@ class _HomeScreenState extends State<vendordashScreen>
                         fillColor: const Color(0xFFF1F2F3),
                         border: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: ColorUtils.secondarycolor(),
+                            color: ColorUtils.primarycolor(),
                             width: 0.5,
                           ),
                           borderRadius: BorderRadius.circular(5),
@@ -815,18 +817,18 @@ class _HomeScreenState extends State<vendordashScreen>
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(5),
                           borderSide: BorderSide(
-                            color: ColorUtils.secondarycolor(),
+                            color: ColorUtils.primarycolor(),
                             width: 0.5,
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(5),
                           borderSide: BorderSide(
-                            color: ColorUtils.secondarycolor(),
+                            color: ColorUtils.primarycolor(),
                             width: 0.5,
                           ),
                         ),
-                        prefixIcon: GestureDetector(
+                        suffixIcon: GestureDetector(
                           onTap: () {
                             Navigator.push(
                               context,
@@ -844,14 +846,14 @@ class _HomeScreenState extends State<vendordashScreen>
                           ),
                         ),
                         constraints: const BoxConstraints(
-                          maxHeight: 36, // Reduced height
+                          maxHeight: 40,
                           maxWidth: double.infinity,
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           vertical: 8,
                           horizontal: 12,
-                        ), // Reduced padding
-                        hintText: 'Search ',
+                        ),
+                        hintText: 'Search',
                         hintStyle: GoogleFonts.poppins(
                           fontWeight: FontWeight.w300,
                           fontSize: 14,
@@ -4003,7 +4005,7 @@ class UniversalPrintHelper {
       }
     }
 
-    if (bookingId.isNotEmpty) {
+    if (bookingId.isNotEmpty && !isPrintAndExit) {
       await SunmiPrinter.printText('\u00A0\n\u00A0'); // Extra space before QR
       await SunmiPrinter.printQRCode(
         bookingId,
@@ -4229,7 +4231,7 @@ class UniversalPrintHelper {
       }
     }
 
-    if (bookingId.isNotEmpty) {
+    if (bookingId.isNotEmpty && !isPrintAndExit) {
       bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
 
       // PineLabs firmware does not support native ESC/POS QR generation
@@ -4911,8 +4913,8 @@ class cardashleft extends StatelessWidget {
             : 'N/A';
     return GestureDetector(
       onTap: () {},
-      child: SizedBox(
-        height: 120,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
         child: Stack(
           children: [
             Positioned(
@@ -4946,7 +4948,7 @@ class cardashleft extends StatelessWidget {
                     5.0,
                   ), // Added padding for better spacing
                   child: Text(
-                    'Booking on : $formattedDate, ${vehicle.parkingTime}',
+                    'Booked On : $formattedDate, ${vehicle.parkingTime}',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
 
@@ -5184,6 +5186,7 @@ class cardashleft extends StatelessWidget {
                                                       bookType: bookType,
                                                       defaultVendorName:
                                                           defaultVendorName,
+                                                      paymentMode: globalSelectedPaymentModes[vehicle.id] ?? 'Online',
                                                       onExitSuccess:
                                                           onExitSuccess,
                                                     ),
@@ -5262,6 +5265,7 @@ class cardashleft extends StatelessWidget {
                                                             ),
                                                       ),
                                                       child: Exitpage(
+                                                        paymentMode: globalSelectedPaymentModes[vehicle.id] ?? 'Online',
                                                         currentTabIndex:
                                                             currentTabIndex,
                                                         userid: vehicle.userid,
@@ -5393,7 +5397,7 @@ class cardashleft extends StatelessWidget {
                                       child: Row(
                                         children: [
                                           Text(
-                                            'Parking Schedule: ',
+                                            'Parking From: ',
                                             style: GoogleFonts.poppins(
                                               fontSize: 14, // Reduced font size
                                               fontWeight: FontWeight.bold,
@@ -5417,6 +5421,7 @@ class cardashleft extends StatelessWidget {
                                     ),
                                   ],
                                 ),
+                                const SizedBox(height: 5),
                                 Row(
                                   children: [
                                     Text(
@@ -5427,6 +5432,69 @@ class cardashleft extends StatelessWidget {
                                       ),
                                     ),
                                     Text(" $formattedPayableDuration"),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Payment Mode:',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    StatefulBuilder(
+                                      builder: (BuildContext context, StateSetter setStateRadio) {
+                                        globalSelectedPaymentModes[vehicle.id] ??= 'Online';
+                                        return Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Radio<String>(
+                                              value: 'Online',
+                                              groupValue: globalSelectedPaymentModes[vehicle.id],
+                                              onChanged: (value) {
+                                                setStateRadio(() {
+                                                  globalSelectedPaymentModes[vehicle.id] = value!;
+                                                });
+                                              },
+                                              activeColor: ColorUtils.primarycolor(),
+                                              visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
+                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                            Text(
+                                              'Online',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                                fontWeight: globalSelectedPaymentModes[vehicle.id] == 'Online' ? FontWeight.bold : FontWeight.normal,
+                                                color: globalSelectedPaymentModes[vehicle.id] == 'Online' ? ColorUtils.primarycolor() : null,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 15),
+                                            Radio<String>(
+                                              value: 'Cash',
+                                              groupValue: globalSelectedPaymentModes[vehicle.id],
+                                              onChanged: (value) {
+                                                setStateRadio(() {
+                                                  globalSelectedPaymentModes[vehicle.id] = value!;
+                                                });
+                                              },
+                                              activeColor: ColorUtils.primarycolor(),
+                                              visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
+                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                            Text(
+                                              'Cash',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                                fontWeight: globalSelectedPaymentModes[vehicle.id] == 'Cash' ? FontWeight.bold : FontWeight.normal,
+                                                color: globalSelectedPaymentModes[vehicle.id] == 'Cash' ? ColorUtils.primarycolor() : null,
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
                                   ],
                                 ),
                                 if (vehicle.status == 'PARKED' &&
@@ -5471,6 +5539,7 @@ class cardashleft extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 25),
               ],
             ),
           ],
@@ -5566,8 +5635,8 @@ class bikedashleft extends StatelessWidget {
             : 'N/A';
     return GestureDetector(
       onTap: () {},
-      child: SizedBox(
-        height: 120,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
         child: Stack(
           children: [
             Positioned(
@@ -5601,7 +5670,7 @@ class bikedashleft extends StatelessWidget {
                     5.0,
                   ), // Added padding for better spacing
                   child: Text(
-                    'Booking on : $formattedDate, ${vehicle.parkingTime}',
+                    'Booked On : $formattedDate, ${vehicle.parkingTime}',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
 
@@ -5839,6 +5908,7 @@ class bikedashleft extends StatelessWidget {
                                                       bookType: bookType,
                                                       defaultVendorName:
                                                           defaultVendorName,
+                                                      paymentMode: globalSelectedPaymentModes[vehicle.id] ?? 'Online',
                                                       onExitSuccess:
                                                           onExitSuccess,
                                                     ),
@@ -5917,6 +5987,7 @@ class bikedashleft extends StatelessWidget {
                                                             ),
                                                       ),
                                                       child: Exitpage(
+                                                        paymentMode: globalSelectedPaymentModes[vehicle.id] ?? 'Online',
                                                         currentTabIndex:
                                                             currentTabIndex,
                                                         userid: vehicle.userid,
@@ -6048,7 +6119,7 @@ class bikedashleft extends StatelessWidget {
                                       child: Row(
                                         children: [
                                           Text(
-                                            'Parking Schedule: ',
+                                            'Parking From: ',
                                             style: GoogleFonts.poppins(
                                               fontSize: 14, // Reduced font size
                                               fontWeight: FontWeight.bold,
@@ -6072,6 +6143,7 @@ class bikedashleft extends StatelessWidget {
                                     ),
                                   ],
                                 ),
+                                const SizedBox(height: 5),
                                 Row(
                                   children: [
                                     Text(
@@ -6082,6 +6154,69 @@ class bikedashleft extends StatelessWidget {
                                       ),
                                     ),
                                     Text(" $formattedPayableDuration"),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Payment Mode:',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    StatefulBuilder(
+                                      builder: (BuildContext context, StateSetter setStateRadio) {
+                                        globalSelectedPaymentModes[vehicle.id] ??= 'Online';
+                                        return Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Radio<String>(
+                                              value: 'Online',
+                                              groupValue: globalSelectedPaymentModes[vehicle.id],
+                                              onChanged: (value) {
+                                                setStateRadio(() {
+                                                  globalSelectedPaymentModes[vehicle.id] = value!;
+                                                });
+                                              },
+                                              activeColor: ColorUtils.primarycolor(),
+                                              visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
+                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                            Text(
+                                              'Online',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                                fontWeight: globalSelectedPaymentModes[vehicle.id] == 'Online' ? FontWeight.bold : FontWeight.normal,
+                                                color: globalSelectedPaymentModes[vehicle.id] == 'Online' ? ColorUtils.primarycolor() : null,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 15),
+                                            Radio<String>(
+                                              value: 'Cash',
+                                              groupValue: globalSelectedPaymentModes[vehicle.id],
+                                              onChanged: (value) {
+                                                setStateRadio(() {
+                                                  globalSelectedPaymentModes[vehicle.id] = value!;
+                                                });
+                                              },
+                                              activeColor: ColorUtils.primarycolor(),
+                                              visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
+                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                            Text(
+                                              'Cash',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                                fontWeight: globalSelectedPaymentModes[vehicle.id] == 'Cash' ? FontWeight.bold : FontWeight.normal,
+                                                color: globalSelectedPaymentModes[vehicle.id] == 'Cash' ? ColorUtils.primarycolor() : null,
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
                                   ],
                                 ),
                                 if (vehicle.status == 'PARKED' &&
@@ -6126,6 +6261,7 @@ class bikedashleft extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 25),
               ],
             ),
           ],
@@ -6221,8 +6357,8 @@ class othersdashleft extends StatelessWidget {
             : 'N/A';
     return GestureDetector(
       onTap: () {},
-      child: SizedBox(
-        height: 120,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
         child: Stack(
           children: [
             Positioned(
@@ -6256,7 +6392,7 @@ class othersdashleft extends StatelessWidget {
                     5.0,
                   ), // Added padding for better spacing
                   child: Text(
-                    'Booking on : $formattedDate, ${vehicle.parkingTime}',
+                    'Booked On : $formattedDate, ${vehicle.parkingTime}',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
 
@@ -6494,6 +6630,7 @@ class othersdashleft extends StatelessWidget {
                                                       bookType: bookType,
                                                       defaultVendorName:
                                                           defaultVendorName,
+                                                      paymentMode: globalSelectedPaymentModes[vehicle.id] ?? 'Online',
                                                       onExitSuccess:
                                                           onExitSuccess,
                                                     ),
@@ -6572,6 +6709,7 @@ class othersdashleft extends StatelessWidget {
                                                             ),
                                                       ),
                                                       child: Exitpage(
+                                                        paymentMode: globalSelectedPaymentModes[vehicle.id] ?? 'Online',
                                                         currentTabIndex:
                                                             currentTabIndex,
                                                         userid: vehicle.userid,
@@ -6703,7 +6841,7 @@ class othersdashleft extends StatelessWidget {
                                       child: Row(
                                         children: [
                                           Text(
-                                            'Parking Schedule: ',
+                                            'Parking From: ',
                                             style: GoogleFonts.poppins(
                                               fontSize: 14, // Reduced font size
                                               fontWeight: FontWeight.bold,
@@ -6727,6 +6865,7 @@ class othersdashleft extends StatelessWidget {
                                     ),
                                   ],
                                 ),
+                                const SizedBox(height: 5),
                                 Row(
                                   children: [
                                     Text(
@@ -6737,6 +6876,69 @@ class othersdashleft extends StatelessWidget {
                                       ),
                                     ),
                                     Text(" $formattedPayableDuration"),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Payment Mode:',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    StatefulBuilder(
+                                      builder: (BuildContext context, StateSetter setStateRadio) {
+                                        globalSelectedPaymentModes[vehicle.id] ??= 'Online';
+                                        return Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Radio<String>(
+                                              value: 'Online',
+                                              groupValue: globalSelectedPaymentModes[vehicle.id],
+                                              onChanged: (value) {
+                                                setStateRadio(() {
+                                                  globalSelectedPaymentModes[vehicle.id] = value!;
+                                                });
+                                              },
+                                              activeColor: ColorUtils.primarycolor(),
+                                              visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
+                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                            Text(
+                                              'Online',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                                fontWeight: globalSelectedPaymentModes[vehicle.id] == 'Online' ? FontWeight.bold : FontWeight.normal,
+                                                color: globalSelectedPaymentModes[vehicle.id] == 'Online' ? ColorUtils.primarycolor() : null,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 15),
+                                            Radio<String>(
+                                              value: 'Cash',
+                                              groupValue: globalSelectedPaymentModes[vehicle.id],
+                                              onChanged: (value) {
+                                                setStateRadio(() {
+                                                  globalSelectedPaymentModes[vehicle.id] = value!;
+                                                });
+                                              },
+                                              activeColor: ColorUtils.primarycolor(),
+                                              visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
+                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                            Text(
+                                              'Cash',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                                fontWeight: globalSelectedPaymentModes[vehicle.id] == 'Cash' ? FontWeight.bold : FontWeight.normal,
+                                                color: globalSelectedPaymentModes[vehicle.id] == 'Cash' ? ColorUtils.primarycolor() : null,
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
                                   ],
                                 ),
                                 if (vehicle.status == 'PARKED' &&
@@ -6783,6 +6985,7 @@ class othersdashleft extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 25),
               ],
             ),
           ],
@@ -6895,8 +7098,8 @@ class vendordashright extends StatelessWidget {
           ),
         );
       },
-      child: SizedBox(
-        height: 120,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
         child: Stack(
           children: [
             Positioned(
@@ -6930,7 +7133,7 @@ class vendordashright extends StatelessWidget {
                     5.0,
                   ), // Added padding for better spacing
                   child: Text(
-                    'Booking on : $formattedDate, ${vehicle.parkingTime}',
+                    'Booked On : $formattedDate, ${vehicle.parkingTime}',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
 
@@ -7317,7 +7520,7 @@ class vendordashright extends StatelessWidget {
                                       child: Row(
                                         children: [
                                           Text(
-                                            'Parking Schedule: ',
+                                            'Parking From: ',
                                             style: GoogleFonts.poppins(
                                               fontSize: 14, // Reduced font size
                                               fontWeight: FontWeight.bold,
@@ -7374,6 +7577,7 @@ class vendordashright extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 25),
               ],
             ),
           ],
@@ -7483,6 +7687,7 @@ class Bookingdata {
   final bool isValet;
   final String valetCharge;
   String? currentCalculatedAmount;
+  String uiPaymentMode = 'Online';
   Bookingdata({
     required this.totalamout,
     required this.amount,
@@ -7615,6 +7820,7 @@ class DashQuickExitHelper {
     required String bookType,
     String? defaultVendorName,
     VoidCallback? onExitSuccess,
+    String paymentMode = 'Cash',
   }) async {
     final String bookingId = vehicle.id;
     if (bookingId.isEmpty) {
@@ -7666,7 +7872,7 @@ class DashQuickExitHelper {
         print('Print failed: $e');
       }
 
-      await _performQuickExit(context, vehicle, currentAmount);
+      await _performQuickExit(context, vehicle, currentAmount, paymentMode);
       if (onExitSuccess != null) {
         onExitSuccess();
       }
@@ -7683,6 +7889,7 @@ class DashQuickExitHelper {
     BuildContext context,
     Bookingdata vehicle,
     String amount,
+    String paymentMode,
   ) async {
     final String bookingId = vehicle.id;
     final url = Uri.parse('${ApiConfig.baseUrl}vendor/exitvehicle/$bookingId');
@@ -7702,7 +7909,7 @@ class DashQuickExitHelper {
     final Map<String, dynamic> requestBody = {
       'amount': parkingCharge,
       'hour': formattedDuration,
-      'paymentMode': 'Cash',
+      'paymentMode': paymentMode,
     };
 
     final userId = vehicle.userid.trim();
@@ -7734,7 +7941,7 @@ class DashQuickExitHelper {
     if (response.statusCode == 200) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Vehicle exited successfully (Cash)!')),
+          SnackBar(content: Text('Vehicle exited successfully ($paymentMode)!')),
         );
       }
     } else {
