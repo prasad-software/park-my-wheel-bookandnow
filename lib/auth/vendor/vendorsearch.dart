@@ -14,6 +14,10 @@ import 'package:mywheels/auth/vendor/vendordash.dart';
 import 'package:mywheels/auth/customer/parking/parkindetails.dart';
 import 'package:tab_container/tab_container.dart';
 import 'package:mywheels/auth/vendor/vendorcreatebooking.dart';
+class GlobalVendorSearchCache {
+  static String? vendorId;
+  static List<Map<String, dynamic>>? allVendors;
+}
 
 class vSearchScreen extends StatefulWidget {
   final String vendorid;
@@ -160,6 +164,13 @@ class _vSearchScreenState extends State<vSearchScreen>
     super.initState();
     print('initState: Fetching vendors for vendorid: ${widget.vendorid}');
 
+    if (GlobalVendorSearchCache.vendorId == widget.vendorid &&
+        GlobalVendorSearchCache.allVendors != null) {
+      allVendors = List.from(GlobalVendorSearchCache.allVendors!);
+      filteredVendors = List.from(allVendors);
+      isLoading = false;
+    }
+
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
@@ -169,7 +180,7 @@ class _vSearchScreenState extends State<vSearchScreen>
       filterVendors(searchController.text);
     });
 
-    fetchVendors();
+    fetchVendors(showLoading: allVendors.isEmpty);
     _payableTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         updatePayableTimes();
@@ -311,11 +322,15 @@ class _vSearchScreenState extends State<vSearchScreen>
       }
 
       if (combinedList.isEmpty) {
-        setState(() {
-          allVendors = [];
-          filteredVendors = [];
-          isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            allVendors = [];
+            filteredVendors = [];
+            isLoading = false;
+          });
+        }
+        GlobalVendorSearchCache.vendorId = widget.vendorid;
+        GlobalVendorSearchCache.allVendors = [];
         return;
       }
 
@@ -379,11 +394,21 @@ class _vSearchScreenState extends State<vSearchScreen>
         return createdAtB.compareTo(createdAtA);
       });
 
-      setState(() {
-        allVendors = combinedList;
+      if (mounted) {
+        setState(() {
+          allVendors = combinedList;
+          // Only reset filteredVendors if we are not actively searching
+          if (searchController.text.isEmpty) {
+            filteredVendors = List.from(allVendors);
+          }
+          isLoading = false;
+          hasError = false;
+        });
         filterVendors(searchController.text);
-        isLoading = false;
-      });
+      }
+
+      GlobalVendorSearchCache.vendorId = widget.vendorid;
+      GlobalVendorSearchCache.allVendors = combinedList;
 
       print(
         'fetchVendors: Loaded ${allVendors.length} total bookings from merged APIs',

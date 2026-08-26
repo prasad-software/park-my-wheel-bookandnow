@@ -41,6 +41,15 @@ import 'menusscreen.dart';
 
 Map<String, String> globalSelectedPaymentModes = {};
 
+class GlobalVendorDashCache {
+  static List<Bookingdata>? carsOnParking;
+  static List<Bookingdata>? carsCompleted;
+  static List<Bookingdata>? bikesOnParking;
+  static List<Bookingdata>? bikesCompleted;
+  static List<Bookingdata>? othersOnParking;
+  static List<Bookingdata>? othersCompleted;
+}
+
 class vendordashScreen extends StatefulWidget {
   final String vendorid;
   final int? initialTabIndex;
@@ -1527,20 +1536,31 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
       updatePayableTimes();
     });
 
-    // Fetch the initial data
+    // Try to load from cache first for instant display
+    if (GlobalVendorDashCache.carsOnParking != null) {
+      bookingDataNotifier.value = GlobalVendorDashCache.carsOnParking!;
+      isLoading = false;
+      updatePayableTimes();
+    }
+
+    // Fetch the initial data in background
     fetchOnParkingData()
         .then((data) {
-          setState(() {
-            bookingDataNotifier.value = data;
-            isLoading =
-                false; // Set loading flag to false after initial data load
-          });
-          updatePayableTimes();
+          if (mounted) {
+            setState(() {
+              bookingDataNotifier.value = data;
+              isLoading = false; // Set loading flag to false after initial data load
+            });
+            updatePayableTimes();
+          }
+          GlobalVendorDashCache.carsOnParking = data;
         })
         .catchError((error) {
-          setState(() {
-            isLoading = false;
-          });
+          if (mounted) {
+            setState(() {
+              isLoading = false;
+            });
+          }
           print('Error fetching booking data: $error');
         });
 
@@ -2061,13 +2081,23 @@ class _BikesTabState extends State<BikesTab>
         print('Selected Tab Index: $selectedTabIndex');
       });
     });
+    // Try to load from cache first for instant display
+    if (GlobalVendorDashCache.bikesOnParking != null) {
+      bookingDataNotifier.value = GlobalVendorDashCache.bikesOnParking!;
+      updatePayableTimes();
+    }
+
     fetchOnParkingData().then((data) {
-      setState(() {
-        bookingDataNotifier.value = data;
-      });
-      updatePayableTimes(); // Call update once data is fetched
+      if (mounted) {
+        setState(() {
+          bookingDataNotifier.value = data;
+        });
+        updatePayableTimes(); // Call update once data is fetched
+      }
+      GlobalVendorDashCache.bikesOnParking = data;
+    }).catchError((error) {
+      // Do nothing on error for bikes tab
     });
-    fetchOnParkingData(); // Initial fetch
     fetchInitialData();
   }
 
@@ -2595,14 +2625,29 @@ class _OthersTabState extends State<OthersTab>
         print('Selected Tab Index: $selectedTabIndex');
       });
     });
+    // Try to load from cache first for instant display
+    if (GlobalVendorDashCache.othersOnParking != null) {
+      bookingDataNotifier.value = GlobalVendorDashCache.othersOnParking!;
+      isLoading = false;
+      updatePayableTimes();
+    }
+
     fetchOnParkingData().then((data) {
-      setState(() {
-        bookingDataNotifier.value = data;
-        isLoading = false;
-      });
-      updatePayableTimes(); // Call update once data is fetched
+      if (mounted) {
+        setState(() {
+          bookingDataNotifier.value = data;
+          isLoading = false;
+        });
+        updatePayableTimes(); // Call update once data is fetched
+      }
+      GlobalVendorDashCache.othersOnParking = data;
+    }).catchError((error) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     });
-    fetchOnParkingData(); // Initial fetch
     fetchInitialData();
   }
 

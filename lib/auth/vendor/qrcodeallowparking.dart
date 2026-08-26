@@ -70,6 +70,31 @@ class _qrcodeallowparkState extends State<qrcodeallowpark>
 
     _checkPermissionStatus();
     _initializeCamera();
+    _fetchVendorData();
+  }
+
+  Future<void> _fetchVendorData() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+
+        if (data['data'] != null) {
+          if (mounted) {
+            setState(() {
+              _menuImageUrl = data['data']['image'];
+            });
+          }
+        }
+      }
+    } catch (error) {
+      debugPrint('fetchVendorData error: $error');
+    }
   }
 
   Future<void> _initializeCamera() async {
@@ -360,13 +385,14 @@ class _qrcodeallowparkState extends State<qrcodeallowpark>
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () {
-            Navigator.pushReplacement(
+            Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
                 builder:
                     (context) =>
                         vendorChooseParkingPage(vendorid: widget.vendorid),
               ),
+              (Route<dynamic> route) => false,
             );
           },
         ),
@@ -1002,16 +1028,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                         ),
                         child: ElevatedButton(
                           onPressed: () {
-                            // Navigate back to the QR code scanner page
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (context) => qrcodeallowpark(
-                                      vendorid: widget.vendorid,
-                                    ),
-                              ),
-                            );
+                            Navigator.pop(context);
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor:
@@ -1388,8 +1405,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                                                 children: [
                                                   RichText(
                                                     text: TextSpan(
-                                                      text:
-                                                          'Parking From: ',
+                                                      text: 'Parking From: ',
                                                       style:
                                                           GoogleFonts.poppins(
                                                             fontSize: 14,
@@ -1446,55 +1462,105 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                                                   ),
                                                   const SizedBox(height: 0),
                                                   Row(
-                                                    mainAxisSize: MainAxisSize.min,
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
                                                     children: [
                                                       Text(
                                                         'Payment Mode:',
-                                                        style: GoogleFonts.poppins(
-                                                          fontSize: 14,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
+                                                        style:
+                                                            GoogleFonts.poppins(
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
                                                       ),
                                                       const SizedBox(width: 5),
                                                       Radio<String>(
                                                         value: 'Online',
-                                                        groupValue: selectedPaymentMode,
+                                                        groupValue:
+                                                            selectedPaymentMode,
                                                         onChanged: (value) {
                                                           setState(() {
-                                                            selectedPaymentMode = value!;
+                                                            selectedPaymentMode =
+                                                                value!;
                                                           });
                                                         },
-                                                        activeColor: ColorUtils.primarycolor(),
-                                                        visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
-                                                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                        activeColor:
+                                                            ColorUtils.primarycolor(),
+                                                        visualDensity:
+                                                            const VisualDensity(
+                                                              horizontal:
+                                                                  VisualDensity
+                                                                      .minimumDensity,
+                                                              vertical:
+                                                                  VisualDensity
+                                                                      .minimumDensity,
+                                                            ),
+                                                        materialTapTargetSize:
+                                                            MaterialTapTargetSize
+                                                                .shrinkWrap,
                                                       ),
                                                       Text(
                                                         'Online',
                                                         style: GoogleFonts.poppins(
                                                           fontSize: 12,
-                                                          fontWeight: selectedPaymentMode == 'Online' ? FontWeight.bold : FontWeight.normal,
-                                                          color: selectedPaymentMode == 'Online' ? ColorUtils.primarycolor() : null,
+                                                          fontWeight:
+                                                              selectedPaymentMode ==
+                                                                      'Online'
+                                                                  ? FontWeight
+                                                                      .bold
+                                                                  : FontWeight
+                                                                      .normal,
+                                                          color:
+                                                              selectedPaymentMode ==
+                                                                      'Online'
+                                                                  ? ColorUtils.primarycolor()
+                                                                  : null,
                                                         ),
                                                       ),
                                                       const SizedBox(width: 15),
                                                       Radio<String>(
                                                         value: 'Cash',
-                                                        groupValue: selectedPaymentMode,
+                                                        groupValue:
+                                                            selectedPaymentMode,
                                                         onChanged: (value) {
                                                           setState(() {
-                                                            selectedPaymentMode = value!;
+                                                            selectedPaymentMode =
+                                                                value!;
                                                           });
                                                         },
-                                                        activeColor: ColorUtils.primarycolor(),
-                                                        visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
-                                                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                        activeColor:
+                                                            ColorUtils.primarycolor(),
+                                                        visualDensity:
+                                                            const VisualDensity(
+                                                              horizontal:
+                                                                  VisualDensity
+                                                                      .minimumDensity,
+                                                              vertical:
+                                                                  VisualDensity
+                                                                      .minimumDensity,
+                                                            ),
+                                                        materialTapTargetSize:
+                                                            MaterialTapTargetSize
+                                                                .shrinkWrap,
                                                       ),
                                                       Text(
                                                         'Cash',
                                                         style: GoogleFonts.poppins(
                                                           fontSize: 12,
-                                                          fontWeight: selectedPaymentMode == 'Cash' ? FontWeight.bold : FontWeight.normal,
-                                                          color: selectedPaymentMode == 'Cash' ? ColorUtils.primarycolor() : null,
+                                                          fontWeight:
+                                                              selectedPaymentMode ==
+                                                                      'Cash'
+                                                                  ? FontWeight
+                                                                      .bold
+                                                                  : FontWeight
+                                                                      .normal,
+                                                          color:
+                                                              selectedPaymentMode ==
+                                                                      'Cash'
+                                                                  ? ColorUtils.primarycolor()
+                                                                  : null,
                                                         ),
                                                       ),
                                                     ],
@@ -2313,12 +2379,13 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       await _performQuickExit(vehicle, currentAmount, manageLoading: false);
 
       if (mounted) {
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
             builder:
                 (context) => vendorChooseParkingPage(vendorid: widget.vendorid),
           ),
+          (Route<dynamic> route) => false,
         );
       }
     } catch (e) {

@@ -919,15 +919,16 @@ class _ExitpageState extends State<Exitpage> {
         if (widget.onExitSuccess != null) {
           widget.onExitSuccess!();
         } else if (widget.goToBookingOnExit) {
-          nav.push(
+          nav.pushAndRemoveUntil(
             MaterialPageRoute(
               builder:
                   (context) =>
                       vendorChooseParkingPage(vendorid: widget.vendorid),
             ),
+            (Route<dynamic> route) => false,
           );
         } else {
-          nav.push(
+          nav.pushAndRemoveUntil(
             MaterialPageRoute(
               builder:
                   (context) => vendordashScreen(
@@ -935,6 +936,7 @@ class _ExitpageState extends State<Exitpage> {
                     initialTabIndex: widget.currentTabIndex,
                   ),
             ),
+            (Route<dynamic> route) => false,
           );
         }
       } else {

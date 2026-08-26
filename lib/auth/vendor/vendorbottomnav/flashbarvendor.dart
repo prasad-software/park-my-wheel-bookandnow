@@ -3,6 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../config/colorcode.dart';
 
+class GlobalVendorState {
+  static String? menuImageUrl;
+}
+
 class BottomNavBar extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onTabChange;
@@ -17,6 +21,14 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (menuImageUrl != null && menuImageUrl!.isNotEmpty) {
+      GlobalVendorState.menuImageUrl = menuImageUrl;
+    }
+    
+    final displayImage = (menuImageUrl != null && menuImageUrl!.isNotEmpty)
+        ? menuImageUrl
+        : GlobalVendorState.menuImageUrl;
+
     return BottomNavigationBar(
       currentIndex: selectedIndex,
       onTap: onTabChange,
@@ -44,10 +56,10 @@ class BottomNavBar extends StatelessWidget {
           label: 'Manage',
         ),
         BottomNavigationBarItem(
-          icon: menuImageUrl != null
+          icon: displayImage != null && displayImage.isNotEmpty
               ? ClipOval(
             child: Image.network(
-              menuImageUrl!,
+              displayImage,
               width: 24,
               height: 24,
               fit: BoxFit.cover,

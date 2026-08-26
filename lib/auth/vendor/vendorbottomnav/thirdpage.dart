@@ -126,6 +126,30 @@ class Third extends StatefulWidget {
   // late List<Widget> _pagess;
   String? _menuImageUrl;
 
+  Future<void> _fetchVendorData() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+
+        if (data['data'] != null) {
+          if (mounted) {
+            setState(() {
+              _menuImageUrl = data['data']['image'];
+            });
+          }
+        }
+      }
+    } catch (error) {
+      debugPrint('fetchVendorData error: $error');
+    }
+  }
+
   void _navigateToPage(int index) {
     setState(() {
       _selecteddIndex = index;
@@ -141,6 +165,7 @@ class Third extends StatefulWidget {
     @override
     void initState() {
       super.initState();
+      _fetchVendorData();
 
       selectedTabIndex = 0;
       selecedIndex = 0;
