@@ -33,7 +33,8 @@ final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 class qrcodeallowpark extends StatefulWidget {
   final String vendorid;
-  const qrcodeallowpark({super.key, required this.vendorid});
+  final bool isFromNewBooking;
+  const qrcodeallowpark({super.key, required this.vendorid, this.isFromNewBooking = false});
 
   @override
   _qrcodeallowparkState createState() => _qrcodeallowparkState();
@@ -344,6 +345,7 @@ class _qrcodeallowparkState extends State<qrcodeallowpark>
                 (context) => BookingDetailsPage(
                   bookingId: qrCode,
                   vendorid: widget.vendorid,
+                  isFromNewBooking: widget.isFromNewBooking,
                 ),
           ),
         ).then((_) {
@@ -379,21 +381,38 @@ class _qrcodeallowparkState extends State<qrcodeallowpark>
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
 
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        if (widget.isFromNewBooking) {
+          Navigator.pop(context);
+        } else {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => vendordashScreen(vendorid: widget.vendorid),
+            ),
+            (Route<dynamic> route) => false,
+          );
+        }
+        return false;
+      },
+      child: Scaffold(
       backgroundColor: ColorUtils.secondarycolor(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (context) =>
-                        vendorChooseParkingPage(vendorid: widget.vendorid),
-              ),
-              (Route<dynamic> route) => false,
-            );
+            if (widget.isFromNewBooking) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => vendordashScreen(vendorid: widget.vendorid),
+                ),
+                (Route<dynamic> route) => false,
+              );
+            }
           },
         ),
         titleSpacing: 15,
@@ -473,7 +492,7 @@ class _qrcodeallowparkState extends State<qrcodeallowpark>
         onTabChange: _onTabChange,
         menuImageUrl: _menuImageUrl,
       ),
-    );
+    ));
   }
 }
 
@@ -501,11 +520,13 @@ class RightToLeftPageRoute extends MaterialPageRoute {
 class BookingDetailsPage extends StatefulWidget {
   final String bookingId;
   final String vendorid;
+  final bool isFromNewBooking;
 
   const BookingDetailsPage({
     super.key,
     required this.bookingId,
     required this.vendorid,
+    this.isFromNewBooking = false,
   });
 
   @override
@@ -2269,6 +2290,21 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       if (amountVal <= 0) {
         setState(() => _isCheckingExit = false);
         await _performQuickExit(vehicle, amountStr);
+        if (mounted) {
+          if (widget.isFromNewBooking) {
+            Navigator.pop(context); // pop BookingDetailsPage
+            Navigator.pop(context); // pop qrcodeallowpark
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) => vendorChooseParkingPage(vendorid: widget.vendorid),
+              ),
+              (Route<dynamic> route) => false,
+            );
+          }
+        }
       } else {
         setState(() => _isCheckingExit = false);
         showModalBottomSheet(
@@ -2304,6 +2340,11 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                     vendorid:
                         vehicle['vendorId']?.toString() ?? widget.vendorid,
                     bookType: vehicle['bookingType']?.toString() ?? '',
+                    goToBookingOnExit: !widget.isFromNewBooking,
+                    onExitSuccess: widget.isFromNewBooking ? () {
+                      Navigator.pop(context); // pop BookingDetailsPage
+                      Navigator.pop(context); // pop qrcodeallowpark page
+                    } : null,
                   ),
                 );
               },
@@ -2379,14 +2420,19 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       await _performQuickExit(vehicle, currentAmount, manageLoading: false);
 
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder:
-                (context) => vendorChooseParkingPage(vendorid: widget.vendorid),
-          ),
-          (Route<dynamic> route) => false,
-        );
+        if (widget.isFromNewBooking) {
+          Navigator.pop(context); // pop BookingDetailsPage
+          Navigator.pop(context); // pop qrcodeallowpark
+        } else {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) => vendorChooseParkingPage(vendorid: widget.vendorid),
+            ),
+            (Route<dynamic> route) => false,
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

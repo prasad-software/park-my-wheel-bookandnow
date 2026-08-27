@@ -2712,7 +2712,13 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         ? const LoadingGif() // Show loading GIF before the Scaffold
         : WillPopScope(
           onWillPop: () async {
-            Navigator.pop(context, _selectedIndex);
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => vendordashScreen(vendorid: widget.vendorid),
+              ),
+              (Route<dynamic> route) => false,
+            );
             return false;
           },
           child: Scaffold(
@@ -2732,7 +2738,13 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                   leading: IconButton(
                     icon: const Icon(Icons.arrow_back),
                     onPressed: () {
-                      Navigator.pop(context, _selectedIndex);
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => vendordashScreen(vendorid: widget.vendorid),
+                        ),
+                        (Route<dynamic> route) => false,
+                      );
                     },
                   ),
                   actions: [
@@ -2743,7 +2755,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                           MaterialPageRoute(
                             builder:
                                 (context) =>
-                                    qrcodeallowpark(vendorid: widget.vendorid),
+                                    qrcodeallowpark(vendorid: widget.vendorid, isFromNewBooking: true),
                           ),
                         );
                       },
