@@ -169,7 +169,7 @@ class NotificationServices {
       return await _firebaseMessaging!.getToken().timeout(const Duration(seconds: 2));
     } catch (e) {
       print('FCM Init Failed (Play Services missing?): $e');
-      return 'No FCM token';
+      return '';
     }
   }
 

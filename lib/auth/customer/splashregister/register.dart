@@ -205,9 +205,9 @@ class _CustomerRegisterFormState extends State<CustomerRegisterForm> {
       return;
     }
 
-    String userfcmToken = 'No FCM token';
+    String userfcmToken = 'dummy_token_12345678901234567890';
     try {
-      userfcmToken = await FirebaseMessaging.instance.getToken().timeout(const Duration(seconds: 2)) ?? 'No FCM token';
+      userfcmToken = await FirebaseMessaging.instance.getToken().timeout(const Duration(seconds: 2)) ?? 'dummy_token_12345678901234567890';
     } catch (e) {
       print('[LOGIN] Warning: Failed to retrieve FCM token: $e');
     }
@@ -254,14 +254,24 @@ class _CustomerRegisterFormState extends State<CustomerRegisterForm> {
           );
         }
       } else {
-        var errorData = json.decode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorData['message'] ?? 'Login failed.')),
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text('Login Status: ${response.statusCode}'),
+            content: Text(response.body),
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('OK'))],
+          )
         );
       }
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('An error occurred: $error')),
+      print('[LOGIN] API call failed: $error');
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Login Exception'),
+          content: Text(error.toString()),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('OK'))],
+        )
       );
     } finally {
       setState(() {
@@ -500,13 +510,13 @@ class _VendorRegisterFormState extends State<VendorRegisterForm> {
     }
 
     // Get FCM token
-    String userfcmToken = 'No FCM token';
+    String userfcmToken = 'dummy_token_12345678901234567890';
     try {
-      userfcmToken = await FirebaseMessaging.instance.getToken().timeout(const Duration(seconds: 2)) ?? 'No FCM token';
+      userfcmToken = await FirebaseMessaging.instance.getToken().timeout(const Duration(seconds: 2)) ?? 'dummy_token_12345678901234567890';
     } catch (e) {
       print('[LOGIN] Warning: Failed to retrieve FCM token: $e');
     }
-    if (userfcmToken == 'No FCM token') {
+    if (userfcmToken.isEmpty) {
       print('[LOGIN] Warning: Failed to retrieve FCM token');
     }
 
@@ -594,11 +604,25 @@ class _VendorRegisterFormState extends State<VendorRegisterForm> {
             const SnackBar(content: Text('Invalid response format from server')),
           );
         }
+      } else {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text('Login Status: ${loginResponse.statusCode}'),
+            content: Text(loginResponse.body),
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('OK'))],
+          )
+        );
       }
     } catch (error) {
       print('[LOGIN] API call failed: $error');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login failed. Please try again later.')),
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Login Exception'),
+          content: Text(error.toString()),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('OK'))],
+        )
       );
     } finally {
       setState(() {

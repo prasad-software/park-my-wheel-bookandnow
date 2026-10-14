@@ -21,6 +21,7 @@ import 'package:mywheels/config/colorcode.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:mywheels/utils/sts_utils.dart';
+import 'package:mywheels/utils/vehicle_image_widget.dart';
 import 'package:pinput/pinput.dart';
 import 'package:tab_container/tab_container.dart';
 
@@ -1307,6 +1308,10 @@ class _BookingsState extends State<Bookings> with SingleTickerProviderStateMixin
                                                     ],
                                                   ),
                                                 ),
+                                                VehicleImageThumbnail(
+                                                  images: vehicle.vehicleImages,
+                                                  vehicleNumber: vehicle.vehicleNumber,
+                                                ),
                                               ],
                                             ),
                                           ],
@@ -2196,6 +2201,10 @@ class _BookingsState extends State<Bookings> with SingleTickerProviderStateMixin
                                                             ),
                                                           ],
                                                         ),
+                                                      ),
+                                                      VehicleImageThumbnail(
+                                                        images: vehicle.vehicleImages,
+                                                        vehicleNumber: vehicle.vehicleNumber,
                                                       ),
                                                     ],
                                                   ),

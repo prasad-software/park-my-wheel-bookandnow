@@ -4,18 +4,18 @@ import 'package:flutter/foundation.dart';
 class PlutusSmart {
   static const MethodChannel _channel = MethodChannel('PLUTUS-API');
 
-  static Future<String> bindToService() async {
+  static Future<bool> isPineLabsDevice() async {
     try {
-      final result = await _channel.invokeMethod('bindToService');
+      final result = await _channel.invokeMethod('isPineLabsDevice');
       if (kDebugMode) {
-        print('bindToService result: $result');
+        print('isPineLabsDevice result: $result');
       }
-      return result;
+      return result == true;
     } catch (e) {
       if (kDebugMode) {
-        print('bindToService error: $e');
+        print('isPineLabsDevice error: $e');
       }
-      return e.toString();
+      return false;
     }
   }
 

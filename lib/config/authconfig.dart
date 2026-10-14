@@ -2,10 +2,10 @@
 
 class ApiConfig {
   // static const String baseUrl = 'https://parkmywheelsapi.onrender.com/';
-  static const String baseUrl = 'https://api.parkmywheels.com/';
-
-  // static const String baseUrl = 'http://localhost:4000/';
- //static const String baseUrl = 'http://192.168.29.189:4000/';
+   // static const String baseUrl = 'https://api.parkmywheels.com/';
+ 
+  // static const String baseUrl = 'http://localhost:4000/'; 
+  static const String baseUrl = 'http://192.168.29.189:4000/';
 
 }
 

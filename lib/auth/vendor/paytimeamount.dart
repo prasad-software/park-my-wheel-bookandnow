@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:mywheels/services/local_db_service.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'vendorsearch.dart';
 import 'package:mywheels/auth/vendor/vendordash.dart';
 import 'package:mywheels/pageloader.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
@@ -33,6 +36,9 @@ class Exitpage extends StatefulWidget {
   final bool goToBookingOnExit;
   final VoidCallback? onExitSuccess;
   final String paymentMode;
+  final bool isValet;
+  final String valetCharge;
+  final String? amount;
   const Exitpage({
     super.key,
     required this.bookingid,
@@ -53,6 +59,9 @@ class Exitpage extends StatefulWidget {
     this.goToBookingOnExit = false,
     this.onExitSuccess,
     this.paymentMode = 'Online',
+    this.isValet = false,
+    this.valetCharge = '0',
+    this.amount,
   });
 
   @override
@@ -178,10 +187,256 @@ class _ExitpageState extends State<Exitpage> {
         }
         updatePayableTimes();
       } else {
-        setState(() => isLoading = false);
+        throw Exception('Non-200 response');
       }
     } catch (_) {
-      if (mounted) setState(() => isLoading = false);
+      try {
+        final vendorDataResponse = LocalDbService.getCachedApiResponse(
+          '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}',
+        );
+        final chargesDataResponse = LocalDbService.getCachedApiResponse(
+          '${ApiConfig.baseUrl}vendor/getchargesdata/${widget.vendorid}',
+        );
+
+        if (vendorDataResponse != null && vendorDataResponse['data'] != null) {
+          final vendorData = vendorDataResponse['data'];
+
+          final String vType = widget.vehicletype.toLowerCase();
+          final List<Exitcharge> offlineCharges = [];
+
+          // Try to load from getchargesdata cache first
+          if (chargesDataResponse != null &&
+              chargesDataResponse['vendor'] != null &&
+              chargesDataResponse['vendor']['charges'] != null) {
+            final List<dynamic> rawCharges =
+                chargesDataResponse['vendor']['charges'];
+            for (var charge in rawCharges) {
+              if (charge['type'] != null && charge['amount'] != null) {
+                String chargeId =
+                    (charge['chargeid']?.toString() ?? '').toUpperCase();
+                bool isCarCharge =
+                    (chargeId == 'A' ||
+                        chargeId == 'B' ||
+                        chargeId == 'C' ||
+                        chargeId == 'D');
+                bool isBikeCharge =
+                    (chargeId == 'E' ||
+                        chargeId == 'F' ||
+                        chargeId == 'G' ||
+                        chargeId == 'H');
+                bool isOtherCharge =
+                    (chargeId == 'I' ||
+                        chargeId == 'J' ||
+                        chargeId == 'K' ||
+                        chargeId == 'L');
+
+                if ((vType == 'car' && isCarCharge) ||
+                    (vType == 'bike' && isBikeCharge) ||
+                    (vType != 'car' && vType != 'bike' && isOtherCharge)) {
+                  offlineCharges.add(
+                    Exitcharge(
+                      type: charge['type'].toString(),
+                      amount:
+                          double.tryParse(charge['amount'].toString()) ?? 0.0,
+                      fullDayCharge:
+                          charge['type'].toString().toLowerCase().contains(
+                                'full day',
+                              )
+                              ? 'FullDay'
+                              : '',
+                    ),
+                  );
+                }
+              }
+            }
+          }
+
+          // Fallback to legacy structure if getchargesdata didn't yield anything
+          if (offlineCharges.isEmpty) {
+            if (vType == 'car') {
+              if (vendorData['cartemp'] != null &&
+                  vendorData['cartemp'].toString().isNotEmpty) {
+                offlineCharges.add(
+                  Exitcharge(
+                    type: '0 to 1 hour',
+                    amount:
+                        double.tryParse(vendorData['cartemp'].toString()) ??
+                        0.0,
+                    fullDayCharge: '',
+                  ),
+                );
+                offlineCharges.add(
+                  Exitcharge(
+                    type: 'Additional 1 hour',
+                    amount:
+                        double.tryParse(vendorData['cartemp'].toString()) ??
+                        0.0,
+                    fullDayCharge: '',
+                  ),
+                );
+              }
+            } else if (vType == 'bike') {
+              if (vendorData['biketemp'] != null &&
+                  vendorData['biketemp'].toString().isNotEmpty) {
+                offlineCharges.add(
+                  Exitcharge(
+                    type: '0 to 1 hour',
+                    amount:
+                        double.tryParse(vendorData['biketemp'].toString()) ??
+                        0.0,
+                    fullDayCharge: '',
+                  ),
+                );
+                offlineCharges.add(
+                  Exitcharge(
+                    type: 'Additional 1 hour',
+                    amount:
+                        double.tryParse(vendorData['biketemp'].toString()) ??
+                        0.0,
+                    fullDayCharge: '',
+                  ),
+                );
+              }
+            } else {
+              if (vendorData['otherstemp'] != null &&
+                  vendorData['otherstemp'].toString().isNotEmpty) {
+                offlineCharges.add(
+                  Exitcharge(
+                    type: '0 to 1 hour',
+                    amount:
+                        double.tryParse(vendorData['otherstemp'].toString()) ??
+                        0.0,
+                    fullDayCharge: '',
+                  ),
+                );
+                offlineCharges.add(
+                  Exitcharge(
+                    type: 'Additional 1 hour',
+                    amount:
+                        double.tryParse(vendorData['otherstemp'].toString()) ??
+                        0.0,
+                    fullDayCharge: '',
+                  ),
+                );
+              }
+            }
+          }
+
+          final bd = Bookingdata(
+            id: widget.bookingid,
+            parkeddate: widget.parkingdate,
+            parkedtime: widget.parkingtime,
+            invoiceid: '',
+            sts: widget.sts,
+            bookType: widget.bookType,
+            bookingtype: widget.bookType,
+            amount: (widget.amount ?? '').isNotEmpty ? widget.amount! : '0',
+            Amount: (widget.amount ?? '').isNotEmpty ? widget.amount! : '0',
+            totalamout: '',
+            status: 'PARKED',
+            payableDuration: Duration.zero,
+            vehicletype: widget.vehicletype,
+            vehicleNumber: widget.vehiclenumber,
+            username: widget.username,
+            mobilenumber: widget.phoneno,
+            Cartype: widget.cartype,
+            Vendorid: widget.vendorid,
+            parkingTime: widget.parkingtime,
+            parkingDate: widget.parkingdate,
+            bookingDate: '',
+            bookingTime: '',
+            Hour: '',
+            Approvedate: '',
+            Approvedtime: '',
+            otp: widget.otp,
+            userid: widget.userid,
+            vendorname: vendorData['vendorName']?.toString() ?? '',
+            subscriptiontype: '',
+            subscriptionenddate: '',
+            invoice: '',
+            exitvehicledate: '',
+            exitvehicletime: '',
+            isValet: widget.isValet,
+            valetCharge: widget.valetCharge,
+          );
+
+          if (mounted) {
+            setState(() {
+              gstPercentage = 0.0;
+              handlingFee = 0.0;
+              parkingCharges = offlineCharges;
+              fullDayChargeType = 'Full Day';
+              bookingDataNotifier.value = [bd];
+              _vendorName = vendorData['vendorName']?.toString();
+              _vendorUpiId = vendorData['upiId']?.toString();
+              isLoading = false;
+            });
+            if (_payableTimer == null || !_payableTimer!.isActive) {
+              _payableTimer = Timer.periodic(const Duration(seconds: 1), (
+                timer,
+              ) {
+                if (mounted) updatePayableTimes();
+              });
+            }
+            updatePayableTimes();
+            return;
+          }
+        }
+      } catch (e) {
+        print("Offline charge fetch failed: $e");
+      }
+
+      if (mounted) {
+        if (bookingDataNotifier.value.isEmpty) {
+          final bd = Bookingdata(
+            id: widget.bookingid,
+            parkeddate: widget.parkingdate,
+            parkedtime: widget.parkingtime,
+            invoiceid: '',
+            sts: widget.sts,
+            bookType: widget.bookType,
+            bookingtype: widget.bookType,
+            amount: widget.amount ?? '0',
+            Amount: widget.amount ?? '0',
+            totalamout: '',
+            status: 'PARKED',
+            payableDuration: Duration.zero,
+            vehicletype: widget.vehicletype,
+            vehicleNumber: widget.vehiclenumber,
+            username: widget.username,
+            mobilenumber: widget.phoneno,
+            Cartype: widget.cartype,
+            Vendorid: widget.vendorid,
+            parkingTime: widget.parkingtime,
+            parkingDate: widget.parkingdate,
+            bookingDate: '',
+            bookingTime: '',
+            Hour: '',
+            Approvedate: '',
+            Approvedtime: '',
+            otp: widget.otp,
+            userid: widget.userid,
+            vendorname: '',
+            subscriptiontype: '',
+            subscriptionenddate: '',
+            invoice: '',
+            exitvehicledate: '',
+            exitvehicletime: '',
+            isValet: widget.isValet,
+            valetCharge: widget.valetCharge,
+          );
+          bookingDataNotifier.value = [bd];
+        }
+
+        setState(() => isLoading = false);
+
+        if (_payableTimer == null || !_payableTimer!.isActive) {
+          _payableTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+            if (mounted) updatePayableTimes();
+          });
+        }
+        updatePayableTimes();
+      }
     }
   }
 
@@ -339,7 +594,28 @@ class _ExitpageState extends State<Exitpage> {
     }
 
     if (isFixedHourPassSts(sts)) {
-      return double.tryParse((bookingBaseAmount ?? '').trim()) ?? 0.0;
+      double amt = double.tryParse((bookingBaseAmount ?? '').trim()) ?? 0.0;
+      if (amt == 0.0 && sts != null) {
+        String hours = sts.replaceAll(RegExp(r'[^0-9]'), '');
+        if (hours.isNotEmpty) {
+          final include1 = RegExp(
+            r'\b' + hours + r'\b.*(?:hour|hours|hr|hrs)\b',
+            caseSensitive: false,
+          );
+          final include2 = RegExp(
+            r'(?:hour|hours|hr|hrs)\b.*\b' + hours + r'\b',
+            caseSensitive: false,
+          );
+          try {
+            var match = parkingCharges.firstWhere((c) {
+              final t = c.type.trim();
+              return include1.hasMatch(t) || include2.hasMatch(t);
+            });
+            amt = match.amount;
+          } catch (_) {}
+        }
+      }
+      return amt;
     }
 
     String bookingTypeLower = bookingType.toLowerCase();
@@ -905,14 +1181,43 @@ class _ExitpageState extends State<Exitpage> {
         requestBody['handlingfee'] = handlingFeeAmount;
         requestBody['totalamout'] = finalTotal;
       }
-      final response = await http.put(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      );
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+
+      http.Response response;
+      if (!isOnline) {
+        requestBody['bookingId'] = bookingId;
+        await LocalDbService.addPendingAction({
+          'type': 'EXIT_BOOKING',
+          'payload': requestBody,
+        });
+        await LocalDbService.markBookingCompletedOffline(
+          bookingId,
+          amount: double.tryParse(
+            requestBody['totalamout']?.toString() ??
+                requestBody['amount']?.toString() ??
+                '0',
+          ),
+          paymentMode: _paymentMode,
+        );
+        GlobalRecentExits.exitedBookingIds.add(bookingId);
+        response = http.Response(
+          '{"message": "Offline: Vehicle exit saved locally"}',
+          200,
+        );
+      } else {
+        response = await http.put(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode(requestBody),
+        );
+      }
 
       if (response.statusCode == 200) {
         print('Booking updated successfully');
+        GlobalRecentExits.exitedBookingIds.add(bookingId);
 
         final nav = Navigator.of(context);
         nav.pop(); // Pop the bottom sheet
@@ -1844,7 +2149,6 @@ class _ExitpageState extends State<Exitpage> {
                       ],
                     ),
                     */
-
                     if (_paymentMode == 'Online')
                       ValueListenableBuilder<List<Bookingdata>>(
                         valueListenable: bookingDataNotifier,

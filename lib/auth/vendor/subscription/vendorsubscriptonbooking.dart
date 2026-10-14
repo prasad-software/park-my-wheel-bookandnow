@@ -3840,12 +3840,14 @@ class _subexitState extends State<subexit> {
     fetchGstData().then((gstData) {
       if (mounted) {
         setState(() {
-          gstPercentage = double.tryParse(gstData['gst'] ?? '0') ?? 0.0;
-          handlingFee = double.tryParse(gstData['handlingfee'] ?? '0') ?? 0.0;
+          gstPercentage = double.tryParse(gstData['gst']?.toString() ?? '0') ?? 0.0;
+          handlingFee = double.tryParse(gstData['handlingfee']?.toString() ?? '0') ?? 0.0;
         });
       }
-    }).then((_) {
-      _initializeData();
+    }).catchError((e) {
+      print('Error fetching GST: $e');
+    }).whenComplete(() {
+      if (mounted) _initializeData();
     });
   }
 
@@ -3933,16 +3935,18 @@ class _subexitState extends State<subexit> {
   }
 
   Future<Map<String, dynamic>> fetchGstData() async {
-    final response = await http.get(Uri.parse('${ApiConfig.baseUrl}vendor/getgstfee'));
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data is List && data.isNotEmpty) {
-        return data[0]; // Return the first GST entry
+    try {
+      final response = await http.get(Uri.parse('${ApiConfig.baseUrl}vendor/getgstfee')).timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is List && data.isNotEmpty) {
+          return data[0]; // Return the first GST entry
+        }
       }
-      return {'gst': '0', 'handlingfee': '0'};
-    } else {
-      throw Exception('Failed to load GST fees');
+    } catch (e) {
+      print('Offline or failed GST fee fetch: $e');
     }
+    return {'gst': '0', 'handlingfee': '0'};
   }
 
   // Helper method for consistent rounding
@@ -3977,7 +3981,7 @@ class _subexitState extends State<subexit> {
     final url = Uri.parse('${ApiConfig.baseUrl}vendor/charges/$vendorId/$vehicleType');
     print('Fetching parking charges from URL: $url');
     try {
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 15));
       print('Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {

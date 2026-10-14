@@ -14,6 +14,8 @@ import '../../../config/colorcode.dart';
 import '../../../utils/sts_utils.dart';
 import '../../../pageloader.dart';
 import 'custom_report.dart'; // Import CustomReportScreen
+import 'package:connectivity_plus/connectivity_plus.dart';
+import '../../../services/local_db_service.dart';
 
 class SummaryReportScreen extends StatefulWidget {
   final String vendorid;
@@ -76,13 +78,71 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
     setState(() {
       _isLoadingHistory = true;
     });
+
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    bool isOnline =
+        connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+
     final url = Uri.parse(
       '${ApiConfig.baseUrl}vendor/getreports/${widget.vendorid}',
     );
     try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+      var data = LocalDbService.getCachedApiResponse(url.toString());
+      if (isOnline) {
+        try {
+          final response = await http.get(url);
+          if (response.statusCode == 200) {
+            final serverData = json.decode(response.body);
+            final serverReports = (serverData['reports'] as List?) ?? [];
+            final localReports = (data?['reports'] as List?) ?? [];
+
+            // Merge local and server reports, avoiding duplicates by reportdate_time
+            final Map<String, dynamic> mergedMap = {};
+            for (var r in localReports) {
+              final key = r['reportdate_time']?.toString() ?? '';
+              if (key.isNotEmpty) mergedMap[key] = r;
+            }
+            for (var r in serverReports) {
+              final key = r['reportdate_time']?.toString() ?? '';
+              if (key.isNotEmpty) mergedMap[key] = r;
+            }
+
+            final mergedList = mergedMap.values.toList();
+            // Sort descending by trying to parse the date
+            mergedList.sort((a, b) {
+              final strA = a['reportdate_time']?.toString() ?? '';
+              final strB = b['reportdate_time']?.toString() ?? '';
+              try {
+                DateTime dA;
+                DateTime dB;
+                try {
+                  dA = DateFormat(
+                    'dd-MM-yyyy hh:mm a',
+                  ).parse(strA.toUpperCase());
+                } catch (_) {
+                  dA = DateFormat('d-M-yyyy hh:mm a').parse(strA.toUpperCase());
+                }
+                try {
+                  dB = DateFormat(
+                    'dd-MM-yyyy hh:mm a',
+                  ).parse(strB.toUpperCase());
+                } catch (_) {
+                  dB = DateFormat('d-M-yyyy hh:mm a').parse(strB.toUpperCase());
+                }
+                return dB.compareTo(dA);
+              } catch (_) {
+                return 0;
+              }
+            });
+
+            data = {'reports': mergedList};
+            LocalDbService.cacheApiResponse(url.toString(), data);
+          }
+        } catch (_) {}
+      }
+
+      if (data != null) {
         final reports = (data['reports'] as List?) ?? [];
 
         // Seed start date from the most-recent report (replaces _fetchLastReport)
@@ -90,10 +150,22 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
           final toDateStr = reports.first['todate_time']?.toString() ?? '';
           try {
             DateTime lastEnd;
-            if (toDateStr.contains('AM') || toDateStr.contains('PM')) {
-              lastEnd = DateFormat('dd-MM-yyyy hh:mm a').parse(toDateStr);
+            final upperToDateStr = toDateStr.toUpperCase();
+            if (upperToDateStr.contains('AM') ||
+                upperToDateStr.contains('PM')) {
+              try {
+                lastEnd = DateFormat(
+                  'dd-MM-yyyy hh:mm a',
+                ).parse(upperToDateStr);
+              } catch (_) {
+                lastEnd = DateFormat('d-M-yyyy hh:mm a').parse(upperToDateStr);
+              }
             } else {
-              lastEnd = DateFormat('dd-MM-yyyy HH:mm').parse(toDateStr);
+              try {
+                lastEnd = DateFormat('dd-MM-yyyy HH:mm').parse(toDateStr);
+              } catch (_) {
+                lastEnd = DateFormat('d-M-yyyy HH:mm').parse(toDateStr);
+              }
             }
             setState(() {
               _lastReportEndTime = lastEnd;
@@ -162,27 +234,83 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
     });
 
     try {
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+
       final start = DateFormat(
         'dd-MM-yyyy',
       ).format(_selectedStartDate ?? _defaultStartDate);
       final end = DateFormat(
         'dd-MM-yyyy',
       ).format(_selectedEndDate ?? _defaultEndDate);
-      final url = Uri.parse(
-        '${ApiConfig.baseUrl}vendor/fast-summary/${widget.vendorid}?startDate=$start&endDate=$end',
-      );
-      final response = await http.get(url);
-      if (response.statusCode != 200) {
-        throw Exception('Failed to load bookings (${response.statusCode})');
+
+      List<Bookingdata> list = [];
+      bool fetchSuccess = false;
+
+      if (isOnline) {
+        try {
+          final url = Uri.parse(
+            '${ApiConfig.baseUrl}vendor/fast-summary/${widget.vendorid}?startDate=$start&endDate=$end',
+          );
+          final response = await http
+              .get(url)
+              .timeout(const Duration(seconds: 10));
+          if (response.statusCode == 200) {
+            final Map<String, dynamic> jsonResponse = json.decode(
+              response.body,
+            );
+            final List<dynamic>? data = jsonResponse['bookings'];
+            final List<Map<String, dynamic>> mapsList =
+                (data ?? [])
+                    .whereType<Map>()
+                    .map((m) => Map<String, dynamic>.from(m))
+                    .toList();
+            LocalDbService.applyPendingExitsToMaps(mapsList);
+            list = mapsList.map((m) => Bookingdata.fromJson(m)).toList();
+            fetchSuccess = true;
+          }
+        } catch (e) {
+          print(
+            "Online fetch failed in SummaryReport, falling back to cache: $e",
+          );
+        }
       }
 
-      final Map<String, dynamic> jsonResponse = json.decode(response.body);
-      final List<dynamic>? data = jsonResponse['bookings'];
-      final list =
-          (data ?? const <dynamic>[])
-              .whereType<Map>()
+      if (!fetchSuccess) {
+        // Offline mode or fallback: Combine all cached dashboard bookings
+        List<Map<String, dynamic>> allBookingsMap =
+            LocalDbService.getAllCachedDashboardBookings(widget.vendorid);
+
+        Map<String, Map<String, dynamic>> combined = {};
+        for (var b in allBookingsMap) {
+          String id = b['_id']?.toString() ?? b['id']?.toString() ?? '';
+          if (id.isNotEmpty) combined[id] = b;
+        }
+
+        final mapsList = combined.values.toList();
+        LocalDbService.applyPendingExitsToMaps(mapsList);
+        list = mapsList.map((m) => Bookingdata.fromJson(m)).toList();
+      }
+
+      // ALWAYS append pending offline bookings, since they might not be on the server yet
+      List<Map<String, dynamic>> pendingOffline =
+          LocalDbService.getOfflineBookingsForVendor(widget.vendorid, '');
+      List<Bookingdata> pendingList =
+          pendingOffline
               .map((m) => Bookingdata.fromJson(Map<String, dynamic>.from(m)))
               .toList();
+
+      Map<String, Bookingdata> finalMap = {};
+      for (var b in pendingList) {
+        if (b.id.isNotEmpty) finalMap[b.id] = b;
+      }
+      for (var b in list) {
+        if (b.id.isNotEmpty) finalMap[b.id] = b;
+      }
+
+      list = finalMap.values.toList();
 
       if (!mounted) return;
       setState(() {
@@ -346,7 +474,18 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
             (exitDateTime.isAtSameMomentAs(end) || exitDateTime.isBefore(end));
       }
 
-      return isBookedInRange || isExitedInRange;
+      final sts = b.sts.trim().toLowerCase();
+      final isPassOrSub =
+          isSubscriptionSts(sts) ||
+          RegExp(r'^\d+(?:hr|h)$', caseSensitive: false).hasMatch(sts);
+
+      // Passes/subscriptions are paid upfront upon booking
+      if (isPassOrSub) {
+        return isBookedInRange;
+      }
+
+      // Hourly / Instant parking is paid on exit; only include in summary after exit
+      return isExitedInRange;
     }).toList();
   }
 
@@ -416,7 +555,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
         continue;
       }
 
-      // Hourly is paid on exit; only include in totals if exited during this report's range.
+      // Hourly is paid on exit; only include count and amount after vehicle has exited
       if (!isPassOrSub && !isExitedInRange) {
         continue;
       }
@@ -467,39 +606,59 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
     required String reportDateTime,
     required String empId,
   }) async {
-    try {
-      final url = Uri.parse('${ApiConfig.baseUrl}vendor/savereport');
-      final headers = {'Content-Type': 'application/json'};
-      final body = json.encode({
-        'vendorid': widget.vendorid,
-        'empid': empId,
-        'fromdate_time': fromDateTime,
-        'todate_time': toDateTime,
-        'entry': entryCount,
-        'exit': exitCount,
-        '12hrsveh': totals.pass12Count,
-        '24hrsveh': totals.pass24Count,
-        '48hrsveh': totals.pass48Count,
-        '72hrsveh': totals.pass72Count,
-        '7daysveh': totals.weeklyCount,
-        '15daysveh': totals.pass15Count,
-        '30daysveh': totals.monthlyCount,
-        '12hrsvehamt': totals.pass12Amount,
-        '24hrsvehamt': totals.pass24Amount,
-        '48hrsvehamt': totals.pass48Amount,
-        '72hrsvehamt': totals.pass72Amount,
-        '7daysvehamt': totals.weeklyAmount,
-        '15daysvehamt': totals.pass15Amount,
-        '30daysvehamt': totals.monthlyAmount,
-        'totals': totals.cashTotal + totals.onlineTotal,
-        'cash': totals.cashTotal,
-        'online': totals.onlineTotal,
-        'hourlycount': totals.hourlyCount,
-        'hourlyamount': totals.hourlyAmount,
-        'reportdate_time': reportDateTime,
-      });
+    final bodyData = {
+      'vendorid': widget.vendorid,
+      'empid': empId,
+      'fromdate_time': fromDateTime,
+      'todate_time': toDateTime,
+      'entry': entryCount,
+      'exit': exitCount,
+      '12hrsveh': totals.pass12Count,
+      '24hrsveh': totals.pass24Count,
+      '48hrsveh': totals.pass48Count,
+      '72hrsveh': totals.pass72Count,
+      '7daysveh': totals.weeklyCount,
+      '15daysveh': totals.pass15Count,
+      '30daysveh': totals.monthlyCount,
+      '12hrsvehamt': totals.pass12Amount,
+      '24hrsvehamt': totals.pass24Amount,
+      '48hrsvehamt': totals.pass48Amount,
+      '72hrsvehamt': totals.pass72Amount,
+      '7daysvehamt': totals.weeklyAmount,
+      '15daysvehamt': totals.pass15Amount,
+      '30daysvehamt': totals.monthlyAmount,
+      'totals': totals.cashTotal + totals.onlineTotal,
+      'cash': totals.cashTotal,
+      'online': totals.onlineTotal,
+      'hourlycount': totals.hourlyCount,
+      'hourlyamount': totals.hourlyAmount,
+      'reportdate_time': reportDateTime,
+    };
 
-      final response = await http.post(url, headers: headers, body: body);
+    try {
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+
+      if (isOnline) {
+        final url = Uri.parse('${ApiConfig.baseUrl}vendor/savereport');
+        final headers = {'Content-Type': 'application/json'};
+        final body = json.encode(bodyData);
+
+        try {
+          await http.post(url, headers: headers, body: body);
+        } catch (_) {}
+      }
+
+      // ALWAYS Add this report to the local cache so it appears in Past Reports,
+      // even if online, in case the backend takes time to index the new report.
+      final urlStr = '${ApiConfig.baseUrl}vendor/getreports/${widget.vendorid}';
+      var data = LocalDbService.getCachedApiResponse(urlStr) ?? {'reports': []};
+      List<dynamic> reports = data['reports'] ?? [];
+      reports.insert(0, bodyData);
+      data['reports'] = reports;
+      LocalDbService.cacheApiResponse(urlStr, data);
     } catch (e) {
       print(
         '[SummaryReport.saveReportToBackend] ERROR POST ${ApiConfig.baseUrl}vendor/savereport -> $e',
@@ -544,7 +703,13 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
 
     final entryCount = list.length;
     final exitCount =
-        list.where((b) => b.exitvehicledate.trim().isNotEmpty && b.status.trim().toUpperCase() != 'PARKED').length;
+        list
+            .where(
+              (b) =>
+                  b.exitvehicledate.trim().isNotEmpty &&
+                  b.status.trim().toUpperCase() != 'PARKED',
+            )
+            .length;
 
     final reportDate = DateFormat('dd-MM-yyyy').format(now);
     final reportTime = DateFormat('hh:mm a').format(now);

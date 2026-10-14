@@ -14,6 +14,10 @@ import 'package:mywheels/auth/vendor/vendordash.dart';
 import 'package:mywheels/auth/customer/parking/parkindetails.dart';
 import 'package:tab_container/tab_container.dart';
 import 'package:mywheels/auth/vendor/vendorcreatebooking.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:mywheels/services/local_db_service.dart';
+import 'package:mywheels/utils/vehicle_image_widget.dart';
+
 class GlobalVendorSearchCache {
   static String? vendorId;
   static List<Map<String, dynamic>>? allVendors;
@@ -96,59 +100,76 @@ class _vSearchScreenState extends State<vSearchScreen>
                   color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
-                child: (() {
-                  final String pmKey = vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? bookingId;
-                  final String paymentMode = _paymentModes[pmKey] ?? 'Online';
-                  return Exitpage(
-                    paymentMode: paymentMode,
-                    currentTabIndex: 0,
-                    userid: vehicle['userid'] ?? vehicle['userId'] ?? '',
-                  otp: vehicle['otp'] ?? '',
-                  vehicletype: vehicle['vehicleType'] ?? '',
-                  bookingid: bookingId,
-                  parkingdate:
-                      vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '',
-                  vehiclenumber: vehicle['vehicleNumber'] ?? '',
-                  username: vehicle['personName'] ?? '',
-                  phoneno: vehicle['mobileNumber'] ?? '',
-                  parkingtime:
-                      vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
-                  bookingtypetemporary: vehicle['status'] ?? '',
-                  sts: vehicle['sts'] ?? '',
-                  cartype: vehicle['carType'] ?? '',
-                  vendorid: vehicle['vendorId'] ?? widget.vendorid,
-                  bookType: vehicle['bookType'] ?? 'Hourly',
-                  onExitSuccess: () {
-                    final now = DateTime.now();
-                    final formattedDate = DateFormat('dd-MM-yyyy').format(now);
-                    setState(() {
-                      for (var v in allVendors) {
-                        if ((v['_id']?.toString() ??
-                                v['id']?.toString() ??
-                                '') ==
-                            bookingId) {
-                          v['status'] = 'COMPLETED';
-                          v['exitvehicledate'] = formattedDate;
-                          v['exitvehicletime'] = DateFormat(
-                            'HH:mm',
+                child:
+                    (() {
+                      final String pmKey =
+                          vehicle['_id']?.toString() ??
+                          vehicle['id']?.toString() ??
+                          bookingId;
+                      final String paymentMode =
+                          _paymentModes[pmKey] ?? 'Online';
+                      return Exitpage(
+                        paymentMode: paymentMode,
+                        currentTabIndex: 0,
+                        userid: vehicle['userid'] ?? vehicle['userId'] ?? '',
+                        otp: vehicle['otp'] ?? '',
+                        vehicletype: vehicle['vehicleType'] ?? '',
+                        bookingid: bookingId,
+                        amount: vehicle['amount']?.toString() ?? '0',
+                        isValet:
+                            vehicle['isValet'] == true ||
+                            vehicle['isValet'] == 'true',
+                        valetCharge: vehicle['valetCharge']?.toString() ?? '0',
+                        parkingdate:
+                            vehicle['parkedDate'] ??
+                            vehicle['parkingDate'] ??
+                            '',
+                        vehiclenumber: vehicle['vehicleNumber'] ?? '',
+                        username: vehicle['personName'] ?? '',
+                        phoneno: vehicle['mobileNumber'] ?? '',
+                        parkingtime:
+                            vehicle['parkedTime'] ??
+                            vehicle['parkingTime'] ??
+                            '',
+                        bookingtypetemporary: vehicle['status'] ?? '',
+                        sts: vehicle['sts'] ?? '',
+                        cartype: vehicle['carType'] ?? '',
+                        vendorid: vehicle['vendorId'] ?? widget.vendorid,
+                        bookType: vehicle['bookType'] ?? 'Hourly',
+                        onExitSuccess: () {
+                          GlobalRecentExits.exitedBookingIds.add(bookingId);
+                          final now = DateTime.now();
+                          final formattedDate = DateFormat(
+                            'dd-MM-yyyy',
                           ).format(now);
-                          break;
-                        }
-                      }
-                      // Remove from current filtered list (since we are on 'On Parking' tab)
-                      filteredVendors.removeWhere(
-                        (v) =>
-                            (v['_id']?.toString() ??
-                                v['id']?.toString() ??
-                                '') ==
-                            bookingId,
+                          setState(() {
+                            for (var v in allVendors) {
+                              if ((v['_id']?.toString() ??
+                                      v['id']?.toString() ??
+                                      '') ==
+                                  bookingId) {
+                                v['status'] = 'COMPLETED';
+                                v['exitvehicledate'] = formattedDate;
+                                v['exitvehicletime'] = DateFormat(
+                                  'HH:mm',
+                                ).format(now);
+                                break;
+                              }
+                            }
+                            // Remove from current filtered list (since we are on 'On Parking' tab)
+                            filteredVendors.removeWhere(
+                              (v) =>
+                                  (v['_id']?.toString() ??
+                                      v['id']?.toString() ??
+                                      '') ==
+                                  bookingId,
+                            );
+                          });
+                          // Still fetch to ensure consistency, but UI is already updated
+                          fetchVendors(showLoading: false);
+                        },
                       );
-                    });
-                    // Still fetch to ensure consistency, but UI is already updated
-                    fetchVendors(showLoading: false);
-                  },
-                );
-              })(), // closes IIFE and Container
+                    })(), // closes IIFE and Container
               ); // closes Container
             }, // closes builder
           ); // closes DraggableScrollableSheet
@@ -292,13 +313,42 @@ class _vSearchScreenState extends State<vSearchScreen>
         });
       }
 
-      final response = await http
-          .get(
-            Uri.parse(
-              '${ApiConfig.baseUrl}vendor/searchscreen/${widget.vendorid}',
-            ),
-          )
-          .timeout(_apiTimeout);
+      late http.Response response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      final String url =
+          '${ApiConfig.baseUrl}vendor/searchscreen/${widget.vendorid}';
+
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(url);
+        if (cached != null) {
+          response = http.Response(jsonEncode(cached), 200);
+        } else {
+          final fallbackBookings = LocalDbService.getAllCachedDashboardBookings(
+            widget.vendorid,
+          );
+          response = http.Response(
+            jsonEncode({'bookings': fallbackBookings}),
+            200,
+          );
+        }
+      } else {
+        response = await http.get(Uri.parse(url)).timeout(_apiTimeout);
+        if (response.statusCode == 200) {
+          try {
+            final decodedBody = jsonDecode(response.body);
+            await LocalDbService.cacheApiResponse(url, decodedBody);
+            // Replace response.body with the mutated JSON so the rest of the function uses it
+            response = http.Response(
+              jsonEncode(decodedBody),
+              200,
+              headers: response.headers,
+            );
+          } catch (_) {}
+        }
+      }
 
       List<Map<String, dynamic>> combinedList = [];
 
@@ -321,6 +371,19 @@ class _vSearchScreenState extends State<vSearchScreen>
         }
       }
 
+      final offlineBookings = LocalDbService.getOfflineBookingsForVendor(
+        widget.vendorid,
+        '',
+      );
+      for (var offlineBooking in offlineBookings) {
+        final bool exists = combinedList.any(
+          (b) => (b['_id'] == offlineBooking['_id']),
+        );
+        if (!exists) {
+          combinedList.add(offlineBooking);
+        }
+      }
+
       if (combinedList.isEmpty) {
         if (mounted) {
           setState(() {
@@ -336,6 +399,11 @@ class _vSearchScreenState extends State<vSearchScreen>
 
       // Initialize default values for missing fields
       for (var vehicle in combinedList) {
+        final bId =
+            vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? '';
+        if (GlobalRecentExits.exitedBookingIds.contains(bId)) {
+          vehicle['status'] = 'COMPLETED';
+        }
         vehicle['vehicleNumber'] ??= 'Unknown';
         vehicle['status'] ??= 'Unknown';
 
@@ -383,15 +451,41 @@ class _vSearchScreenState extends State<vSearchScreen>
 
       // Sort by latest first
       combinedList.sort((a, b) {
-        final createdAtA =
-            a['createdAt'] != null
-                ? DateTime.parse(a['createdAt'])
-                : DateTime(0);
-        final createdAtB =
-            b['createdAt'] != null
-                ? DateTime.parse(b['createdAt'])
-                : DateTime(0);
-        return createdAtB.compareTo(createdAtA);
+        DateTime getSortDate(Map<String, dynamic> map) {
+          if (map['createdAt'] != null) {
+            try {
+              return DateTime.parse(map['createdAt']);
+            } catch (_) {}
+          }
+          // Fallback for offline bookings or if createdAt is missing
+          try {
+            final dateStr =
+                map['parkedDate'] ?? map['parkingDate'] ?? map['bookingDate'];
+            final timeStr =
+                map['parkedTime'] ?? map['parkingTime'] ?? map['bookingTime'];
+            if (dateStr != null && timeStr != null) {
+              final dateParts = dateStr.split('-');
+              final day = int.parse(dateParts[0]);
+              final month = int.parse(dateParts[1]);
+              final year = int.parse(dateParts[2]);
+              final timeFormat = DateFormat('hh:mm a');
+              final time = timeFormat.parse(timeStr);
+              return DateTime(
+                year,
+                month,
+                day,
+                time.hour,
+                time.minute,
+                time.second,
+              );
+            }
+          } catch (_) {}
+          return DateTime.now(); // Assume it's a very recent offline booking
+        }
+
+        final dateA = getSortDate(a);
+        final dateB = getSortDate(b);
+        return dateB.compareTo(dateA);
       });
 
       if (mounted) {
@@ -529,6 +623,7 @@ class _vSearchScreenState extends State<vSearchScreen>
 
       if (mounted) {
         setState(() {
+          GlobalRecentExits.exitedBookingIds.add(bookingId);
           // Optimistically update to COMPLETED instead of removing entirely
           final now = DateTime.now();
           final formattedDate = DateFormat('dd-MM-yyyy').format(now);
@@ -663,7 +758,8 @@ class _vSearchScreenState extends State<vSearchScreen>
 
       final parkingCharge = double.tryParse(amount.trim()) ?? 0.0;
 
-      final String pmKey = vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? bookingId;
+      final String pmKey =
+          vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? bookingId;
       final paymentMode = _paymentModes[pmKey] ?? 'Online';
 
       final Map<String, dynamic> requestBody = {
@@ -699,35 +795,76 @@ class _vSearchScreenState extends State<vSearchScreen>
         'QuickExit: Request payload - Amount: $parkingCharge, Duration: $formattedDuration',
       );
 
-      final response = await http
-          .put(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(requestBody),
-          )
-          .timeout(_exitApiTimeout);
+      try {
+        final response = await http
+            .put(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode(requestBody),
+            )
+            .timeout(_exitApiTimeout);
 
-      print('Quick Exit Response: ${response.statusCode} - ${response.body}');
+        print('Quick Exit Response: ${response.statusCode} - ${response.body}');
 
-      if (response.statusCode == 200) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(
-              content: Text('Vehicle exited successfully ($paymentMode)!'),
-            ),
-          );
+        if (response.statusCode == 200) {
+          GlobalRecentExits.exitedBookingIds.add(bookingId);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Vehicle exited successfully ($paymentMode)!'),
+              ),
+            );
+          }
+        } else {
+          String errMsg = 'Failed to exit vehicle (${response.statusCode})';
+          try {
+            final data = jsonDecode(response.body);
+            errMsg = data['message'] ?? data['error'] ?? errMsg;
+          } catch (_) {}
+          throw Exception(errMsg);
         }
-      } else {
-        String errMsg = 'Failed to exit vehicle (${response.statusCode})';
-        try {
-          final data = jsonDecode(response.body);
-          errMsg = data['message'] ?? data['error'] ?? errMsg;
-        } catch (_) {}
-        throw Exception(errMsg);
+      } catch (e) {
+        final isOffline =
+            e.toString().contains('SocketException') ||
+            e.toString().contains('TimeoutException');
+        if (isOffline) {
+          GlobalRecentExits.exitedBookingIds.add(bookingId);
+          // Offline Exit Flow
+          await LocalDbService.addPendingAction({
+            'type': 'EXIT_BOOKING',
+            'offline_id': bookingId,
+            'payload': {'bookingId': bookingId, ...requestBody},
+          });
+          await LocalDbService.markBookingCompletedOffline(
+            bookingId,
+            amount: double.tryParse(
+              requestBody['totalamout']?.toString() ??
+                  requestBody['amount']?.toString() ??
+                  '0',
+            ),
+            paymentMode: paymentMode,
+          );
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Vehicle exited offline ($paymentMode)! Will sync later.',
+                ),
+              ),
+            );
+          }
+        } else {
+          print('Error in _performQuickExit: $e');
+          rethrow;
+        }
       }
     } catch (e) {
-      print('Error in _performQuickExit: $e');
-      rethrow;
+      if (!e.toString().contains('SocketException') &&
+          !e.toString().contains('TimeoutException')) {
+        print('Error in _performQuickExit outer: $e');
+        rethrow;
+      }
     } finally {
       if (manageLoading) {
         _setExiting(bookingId, false);
@@ -1098,6 +1235,15 @@ class _vSearchScreenState extends State<vSearchScreen>
                 isSubscriptionSts(vehicle['subsctiptiontype']?.toString());
             final remainingDaysMessage =
                 isSubscription ? getRemainingDaysMessage(vehicle) : '';
+            final List<String> vehicleImages = (vehicle['vehicleImages'] is List)
+                ? (vehicle['vehicleImages'] as List)
+                    .map((e) => e.toString().trim())
+                    .where((s) => s.isNotEmpty)
+                    .toList()
+                : (vehicle['vehicleImage'] != null &&
+                        vehicle['vehicleImage'].toString().trim().isNotEmpty)
+                    ? [vehicle['vehicleImage'].toString().trim()]
+                    : const [];
             return GestureDetector(
               onTap: () {
                 print('build: Vehicle ${vehicle['vehicleNumber']} tapped');
@@ -2163,7 +2309,9 @@ class _vSearchScreenState extends State<vSearchScreen>
                                                   ?.toString(),
                                             ))
                                           Padding(
-                                            padding: const EdgeInsets.only(top: 4.0),
+                                            padding: const EdgeInsets.only(
+                                              top: 4.0,
+                                            ),
                                             child: Row(
                                               children: [
                                                 Text(
@@ -2361,6 +2509,11 @@ class _vSearchScreenState extends State<vSearchScreen>
                                         ),
                                       ],
                                     ),
+                                  ),
+                                  VehicleImageThumbnail(
+                                    images: vehicleImages,
+                                    vehicleNumber:
+                                        vehicle['vehicleNumber']?.toString() ?? '',
                                   ),
                                 ],
                               ),

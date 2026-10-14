@@ -106,7 +106,7 @@ class _ParkingPageState extends State<ParkingPage> with RouteAware, SingleTicker
     'Cancelled': 85,
     'PENDING': 85,
     'PARKED': 85,
-
+    
     'Default': 85,
   };
   void _showExitConfirmation(VehicleBooking vehicle) async {

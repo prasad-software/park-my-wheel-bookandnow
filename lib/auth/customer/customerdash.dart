@@ -31,15 +31,17 @@ import 'dart:async';
 
 // For image processing and custom markers
 
-
 import 'drawer/mylist.dart';
 import 'dummypages/usersubcription.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:mywheels/services/local_db_service.dart';
 
 class customdashScreen extends StatefulWidget {
   final String userId;
   final LatLng? initialPosition;
-  const customdashScreen({super.key,
-     this.initialPosition,
+  const customdashScreen({
+    super.key,
+    this.initialPosition,
     required this.userId,
   });
 
@@ -47,7 +49,8 @@ class customdashScreen extends StatefulWidget {
   State<customdashScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<customdashScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends State<customdashScreen>
+    with TickerProviderStateMixin {
   final LatLng _center = const LatLng(12.9716, 77.5946);
   GoogleMapController? _mapController;
   bool _isSlotListingExpanded = false;
@@ -66,14 +69,21 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     {'name': 'Within 10 km', 'icon': null, 'svgIcon': null},
     {'name': '24 hours parking', 'icon': null, 'svgIcon': null},
     {'name': 'Monthly parking', 'icon': null, 'svgIcon': null},
-    {'name': 'Filter', 'icon': Icons.filter_alt, 'svgIcon': null}, // Custom SVG for Filter
-    {'name': 'View all', 'icon': Icons.view_list, 'svgIcon': null}, // Custom SVG for View all
+    {
+      'name': 'Filter',
+      'icon': Icons.filter_alt,
+      'svgIcon': null,
+    }, // Custom SVG for Filter
+    {
+      'name': 'View all',
+      'icon': Icons.view_list,
+      'svgIcon': null,
+    }, // Custom SVG for View all
   ];
   final bookOptions = [
     'Instant Parking',
     'Schedule Now & Park Later',
     'Monthly Parking Subscription',
-
   ];
   void _handleParkingOptionSelect(Map<String, dynamic> option) {
     setState(() {
@@ -84,14 +94,17 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => filterscreen( // Use correct case for FilterScreen
-          userid: widget.userId,
-          title: "Search Parking",
-          selectedOption: option['name'], // Pass the name field
-        ),
+        builder:
+            (context) => filterscreen(
+              // Use correct case for FilterScreen
+              userid: widget.userId,
+              title: "Search Parking",
+              selectedOption: option['name'], // Pass the name field
+            ),
       ),
     );
   }
+
   void _handlebookOptionSelect(String option) {
     setState(() {
       selectedParkingOption = option;
@@ -109,6 +122,7 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     //   ),
     // );
   }
+
   String address = '';
   bool isLoading = true; // Start loading by default
   List<Map<String, dynamic>> vendors = [];
@@ -125,7 +139,6 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
   late Animation<Offset> _mapSlideAnimation;
   late AnimationController _animationController;
 
-
   late AnimationController _leftAnimationController;
   late Animation<Offset> _leftSlideAnimation;
 
@@ -138,6 +151,7 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
   void _TabChange(int index) {
     _navigatePage(index);
   }
+
   @override
   void initState() {
     super.initState();
@@ -161,10 +175,12 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     _searchSlideAnimation = Tween<Offset>(
       begin: const Offset(0, 1), // Start from the bottom
       end: Offset.zero, // End at the original position
-    ).animate(CurvedAnimation(
-      parent: _searchAnimationController,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _searchAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
 
     // Initialize carousel animation
     _carouselAnimationController = AnimationController(
@@ -175,10 +191,12 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     _carouselSlideAnimation = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _carouselAnimationController,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _carouselAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
 
     // Initialize grid animation
     _gridAnimationController = AnimationController(
@@ -189,10 +207,12 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     _gridSlideAnimation = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _gridAnimationController,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _gridAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
 
     // Initialize map animation
     _mapAnimationController = AnimationController(
@@ -203,10 +223,9 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     _mapSlideAnimation = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _mapAnimationController,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(
+      CurvedAnimation(parent: _mapAnimationController, curve: Curves.easeInOut),
+    );
 
     // Initialize animation controllers
     _animationController = AnimationController(
@@ -229,18 +248,22 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     _leftSlideAnimation = Tween<Offset>(
       begin: const Offset(-1, 0), // Start from the left
       end: Offset.zero, // End at the original position
-    ).animate(CurvedAnimation(
-      parent: _leftAnimationController,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _leftAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
 
     _rightSlideAnimation = Tween<Offset>(
       begin: const Offset(1, 0), // Start from the right
       end: Offset.zero, // End at the original position
-    ).animate(CurvedAnimation(
-      parent: _rightAnimationController,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _rightAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
 
     // Start the animations after a short delay
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -252,6 +275,7 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
       _rightAnimationController.forward();
     });
   }
+
   @override
   void dispose() {
     _searchAnimationController.dispose();
@@ -263,12 +287,14 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     _rightAnimationController.dispose();
     super.dispose();
   }
+
   Future<void> fetchBanners() async {
     setState(() {
       _isLoading = true; // Start loading
     });
 
-    const String apiUrl = '${ApiConfig.baseUrl}vendor/getbanner'; // Replace with your API endpoint
+    const String apiUrl =
+        '${ApiConfig.baseUrl}vendor/getbanner'; // Replace with your API endpoint
     // print('Fetching banners from API: $apiUrl');
 
     try {
@@ -276,7 +302,9 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
       // print('API response received. Status code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body); // Assuming the response is a JSON object
+        final data = jsonDecode(
+          response.body,
+        ); // Assuming the response is a JSON object
 
         if (data['banners'] != null) {
           setState(() {
@@ -304,6 +332,7 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
       });
     }
   }
+
   Future<void> _requestNotificationPermission() async {
     // Check the current status of the notification permission
     var status = await Permission.notification.status;
@@ -331,7 +360,8 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
         return AlertDialog(
           title: const Text('Permission Denied'),
           content: const Text(
-              'Notification permission is required for this feature. Please enable it in the app settings.'),
+            'Notification permission is required for this feature. Please enable it in the app settings.',
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -344,16 +374,38 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
       },
     );
   }
+
   Future<void> _fetchUserData() async {
     try {
-      final response = await http.get(Uri.parse('${ApiConfig.baseUrl}get-userdata?id=${widget.userId}'));
+      final String url = '${ApiConfig.baseUrl}get-userdata?id=${widget.userId}';
+      late http.Response response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline = connectivityResult.isNotEmpty && connectivityResult.first != ConnectivityResult.none;
+
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(url);
+        if (cached != null) {
+          response = http.Response(jsonEncode(cached), 200);
+        } else {
+          response = http.Response('{}', 500);
+        }
+      } else {
+        response = await http.get(Uri.parse(url));
+        if (response.statusCode == 200) {
+          try {
+            LocalDbService.cacheApiResponse(url, jsonDecode(response.body));
+          } catch (_) {}
+        }
+      }
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
 
-        if (data['success'] && data['data'] != null) {
+        if (data['success'] == true && data['data'] != null) {
           setState(() {
-            _user = User.fromJson(data['data']); // Initialize user with fetched data
+            _user = User.fromJson(
+              data['data'],
+            ); // Initialize user with fetched data
           });
         } else {
           throw Exception(data['message']);
@@ -364,13 +416,11 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     } catch (error) {
       // print('Error fetching user data: $error');
       // Show error message to user
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to load user data')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to load user data')));
     }
   }
-
-
 
   Future<void> _requestPermission() async {
     LocationPermission permission = await Geolocator.checkPermission();
@@ -384,13 +434,14 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     }
   }
 
-
   String apiUrl = '${ApiConfig.baseUrl}vendor/fetch-all-vendor-data';
 
   Future<List<Map<String, dynamic>>> fetchVendors() async {
     // print('Fetching vendors from API...');
     try {
-      final response = await http.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 2));
+      final response = await http
+          .get(Uri.parse(apiUrl))
+          .timeout(const Duration(seconds: 2));
       // print('API response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -398,16 +449,19 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
         // print('API response body: $jsonResponse');
 
         if (jsonResponse['data'] != null) {
-          List<Map<String, dynamic>> vendorsList = (jsonResponse['data'] as List)
-              .map((vendor) => {
-            'name': vendor['vendorName'],
-            'latitude': double.parse(vendor['latitude']),
-            'longitude': double.parse(vendor['longitude']),
-            'image': vendor['image'],
-            'address': vendor['address'],
-            'contactNo': vendor['contactNo'],
-          })
-              .toList();
+          List<Map<String, dynamic>> vendorsList =
+              (jsonResponse['data'] as List)
+                  .map(
+                    (vendor) => {
+                      'name': vendor['vendorName'],
+                      'latitude': double.parse(vendor['latitude']),
+                      'longitude': double.parse(vendor['longitude']),
+                      'image': vendor['image'],
+                      'address': vendor['address'],
+                      'contactNo': vendor['contactNo'],
+                    },
+                  )
+                  .toList();
 
           // print('Fetched ${vendorsList.length} vendors');
           return vendorsList;
@@ -425,9 +479,6 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     }
   }
 
-
-
-
   final int _selectedIndex = 0;
   int _selecteIndex = 0;
   late List<Widget> _pages;
@@ -442,22 +493,59 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
     );
   }
 
-
-
   final List<Map<String, dynamic>> ramData = [
-    {'head': 'Book Parking', 'bottom': '','data': '100', 'icon': 'assets/myspace.svg'},
-    {'head': 'My Bookings', 'bottom': '', 'data': '100', 'icon': 'assets/parking.svg' },
-    {'head': 'Monthly', 'bottom': 'Subscription', 'data': '100', 'icon': 'assets/blockspot.svg' },
+    {
+      'head': 'Book Parking',
+      'bottom': '',
+      'data': '100',
+      'icon': 'assets/myspace.svg',
+    },
+    {
+      'head': 'My Bookings',
+      'bottom': '',
+      'data': '100',
+      'icon': 'assets/parking.svg',
+    },
+    {
+      'head': 'Monthly',
+      'bottom': 'Subscription',
+      'data': '100',
+      'icon': 'assets/blockspot.svg',
+    },
     // {'head': 'Monthly','bottom': 'Booking',  'data': '100', 'icon': Icons.business_center},
-    {'head': 'Explore','bottom': '', 'data': '100', 'icon': 'assets/explore.svg'},
+    {
+      'head': 'Explore',
+      'bottom': '',
+      'data': '100',
+      'icon': 'assets/explore.svg',
+    },
     // {'head': 'Create Parking', 'data': '100', 'icon': Icons.create},
-    {'head': 'Favourite','bottom': 'Parking', 'data': '100', 'icon': 'assets/favourite.svg'},
+    {
+      'head': 'Favourite',
+      'bottom': 'Parking',
+      'data': '100',
+      'icon': 'assets/favourite.svg',
+    },
 
-    {'head': 'My', 'bottom': 'Business','data': '100', 'icon': 'assets/bookparking.svg'},
-    {'head': 'Corporate','bottom':'Solutions',  'data': '100', 'icon': 'assets/corporate.svg'},
-    {'head': 'More', 'bottom':'Services', 'data': '100', 'icon': 'assets/grid.svg',},
+    {
+      'head': 'My',
+      'bottom': 'Business',
+      'data': '100',
+      'icon': 'assets/bookparking.svg',
+    },
+    {
+      'head': 'Corporate',
+      'bottom': 'Solutions',
+      'data': '100',
+      'icon': 'assets/corporate.svg',
+    },
+    {
+      'head': 'More',
+      'bottom': 'Services',
+      'data': '100',
+      'icon': 'assets/grid.svg',
+    },
   ];
-
 
   @override
   Widget build(BuildContext context) {
@@ -481,7 +569,9 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => AddMyCar(userId: widget.userId)),
+                  MaterialPageRoute(
+                    builder: (context) => AddMyCar(userId: widget.userId),
+                  ),
                 );
               },
               child: Container(
@@ -489,12 +579,17 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
                 width: 110,
                 decoration: BoxDecoration(
                   color: ColorUtils.primarycolor(), // Background color
-                  border: Border.all(color: ColorUtils.primarycolor(), width: 1), // Border color and width
+                  border: Border.all(
+                    color: ColorUtils.primarycolor(),
+                    width: 1,
+                  ), // Border color and width
                   borderRadius: BorderRadius.circular(20), // Rounded corners
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center, // Center content horizontally
-                  crossAxisAlignment: CrossAxisAlignment.center, // Center content vertically
+                  mainAxisAlignment:
+                      MainAxisAlignment.center, // Center content horizontally
+                  crossAxisAlignment:
+                      CrossAxisAlignment.center, // Center content vertically
                   children: [
                     Text(
                       'Add vehicle', // The text to display
@@ -504,7 +599,9 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
                         fontSize: 11,
                       ), // Customize the text style
                     ),
-                    const SizedBox(width: 5), // Add spacing between the text and icon
+                    const SizedBox(
+                      width: 5,
+                    ), // Add spacing between the text and icon
                     const Icon(
                       Icons.add_circle,
                       size: 16, // Adjust the size of the icon
@@ -519,7 +616,8 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
             position: _rightSlideAnimation,
             child: IconButton(
               icon: CircleAvatar(
-                backgroundColor: ColorUtils.primarycolor(), // Customize the background color
+                backgroundColor:
+                    ColorUtils.primarycolor(), // Customize the background color
                 child: const Icon(
                   size: 20,
                   Icons.notifications,
@@ -529,7 +627,10 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => NotificationScreen(userid:widget.userId)),
+                  MaterialPageRoute(
+                    builder:
+                        (context) => NotificationScreen(userid: widget.userId),
+                  ),
                 );
               },
             ),
@@ -539,22 +640,24 @@ class _HomeScreenState extends State<customdashScreen> with TickerProviderStateM
         leading: SlideTransition(
           position: _leftSlideAnimation,
           child: Builder(
-            builder: (context) => IconButton(
-              icon: Icon(
-                Icons.menu,
-                color: ColorUtils.primarycolor(), // Keeps the menu icon aligned with your theme
-                size: 24, // Adjust the size if needed
-              ),
-              onPressed: () {
-                Scaffold.of(context).openDrawer(); // Opens the drawer
-              },
-            ),
+            builder:
+                (context) => IconButton(
+                  icon: Icon(
+                    Icons.menu,
+                    color:
+                        ColorUtils.primarycolor(), // Keeps the menu icon aligned with your theme
+                    size: 24, // Adjust the size if needed
+                  ),
+                  onPressed: () {
+                    Scaffold.of(context).openDrawer(); // Opens the drawer
+                  },
+                ),
           ),
         ),
       ),
       drawer: CustomDrawer(
-userid:widget.userId,
-        imageUrl: _user?.imageUrl?? '',
+        userid: widget.userId,
+        imageUrl: _user?.imageUrl ?? '',
         username: _user?.username ?? '',
         mobileNumber: _user?.mobileNumber ?? '',
         onLogout: () {
@@ -567,19 +670,18 @@ userid:widget.userId,
           });
         },
       ),
-      body: SafeArea(
-        child: _buildRamScreen(),
+      body: SafeArea(child: _buildRamScreen()),
+      bottomNavigationBar: CustomerBottomNavBar(
+        selectedIndex: _selecteIndex,
+        onTabChange: _TabChange,
       ),
-        bottomNavigationBar: CustomerBottomNavBar(
-          selectedIndex: _selecteIndex,
-          onTabChange: _TabChange,
-        ),
-
     );
   }
+
   Widget _buildSkeletonLoader() {
     return SafeArea(
-      child: Center( // Ensures content is centered
+      child: Center(
+        // Ensures content is centered
         child: SizedBox(
           height: 86,
           width: 100,
@@ -597,97 +699,110 @@ userid:widget.userId,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-
           SlideTransition(
             position: _carouselSlideAnimation,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 0),
               child: Column(
-                        children: [
-                          _isLoading
-            ? _buildSkeletonLoader()
-            : CarouselSlider(
-                            items: bannerList.map((banner) {
-            return Container(
+                children: [
+                  _isLoading
+                      ? _buildSkeletonLoader()
+                      : CarouselSlider(
+                        items:
+                            bannerList.map((banner) {
+                              return Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(
+                                    color: ColorUtils.primarylight(),
+                                    width: 0,
+                                  ),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(5),
+                                  child: Image.network(
+                                    banner,
+                                    fit:
+                                        BoxFit
+                                            .cover, // Ensures image fits entire width & height
+                                    width: double.infinity,
 
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(5),
-                border: Border.all(
-                  color: ColorUtils.primarylight(),
-                  width: 0,
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(5),
-                child: Image.network(
-                  banner,
-                  fit: BoxFit.cover, // Ensures image fits entire width & height
-                  width: double.infinity,
-
-                  // fit: BoxFit.fill, // Ensures the image fits horizontally
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(40.0),
-                        child: Image.asset('assets/gifload.gif',),
+                                    // fit: BoxFit.fill, // Ensures the image fits horizontally
+                                    loadingBuilder: (
+                                      context,
+                                      child,
+                                      loadingProgress,
+                                    ) {
+                                      if (loadingProgress == null) return child;
+                                      return Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(40.0),
+                                          child: Image.asset(
+                                            'assets/gifload.gif',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(Icons.error);
+                                    },
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                        options: CarouselOptions(
+                          height:
+                              MediaQuery.of(context).size.height *
+                              0.17, // Adjust height as needed
+                          autoPlay: true,
+                          enableInfiniteScroll: false,
+                          viewportFraction: 1.0, // Full width
+                          scrollPhysics: const BouncingScrollPhysics(),
+                          aspectRatio: 16 / 8, // Adjust aspect ratio as needed
+                          enlargeCenterPage: true,
+                          scrollDirection: Axis.horizontal,
+                          autoPlayCurve: Curves.fastOutSlowIn,
+                          autoPlayAnimationDuration: const Duration(
+                            milliseconds: 800,
+                          ),
+                          onPageChanged: (index, reason) {
+                            setState(() {
+                              myActiveIndex = index;
+                            });
+                          },
+                        ),
                       ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(Icons.error);
-                  },
-                ),
-              ),
-            );
-                            }).toList(),
-                            options: CarouselOptions(
-
-            height: MediaQuery.of(context).size.height * 0.17, // Adjust height as needed
-            autoPlay: true,
-            enableInfiniteScroll: false,
-            viewportFraction: 1.0, // Full width
-            scrollPhysics: const BouncingScrollPhysics(),
-            aspectRatio: 16 / 8, // Adjust aspect ratio as needed
-            enlargeCenterPage: true,
-            scrollDirection: Axis.horizontal,
-            autoPlayCurve: Curves.fastOutSlowIn,
-            autoPlayAnimationDuration: const Duration(milliseconds: 800),
-            onPageChanged: (index, reason) {
-              setState(() {
-                myActiveIndex = index;
-              });
-            },
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children:
+                        bannerList.asMap().entries.map((entry) {
+                          return GestureDetector(
+                            child: Container(
+                              width: myActiveIndex == entry.key ? 20 : 12,
+                              height: 8.0,
+                              margin: const EdgeInsets.symmetric(
+                                vertical: 8.0,
+                                horizontal: 4.0,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                color: ColorUtils.primarycolor().withOpacity(
+                                  myActiveIndex == entry.key ? 0.9 : 0.4,
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: bannerList.asMap().entries.map((entry) {
-            return GestureDetector(
-              child: Container(
-                width: myActiveIndex == entry.key ? 20 : 12,
-                height: 8.0,
-                margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  color: ColorUtils.primarycolor().withOpacity(
-                      myActiveIndex == entry.key ? 0.9 : 0.4),
-                ),
-              ),
-            );
-                            }).toList(),
-                          ),
-
-                        ],
+                          );
+                        }).toList(),
+                  ),
+                ],
               ),
             ),
           ),
 
-
           SlideTransition(
             position: _searchSlideAnimation,
-            child:  Container(
+            child: Container(
               decoration: const BoxDecoration(
                 // color: Colors.white, // Background color
                 borderRadius: BorderRadius.only(
@@ -706,7 +821,7 @@ userid:widget.userId,
               child: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric( horizontal: 15),
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
                     child: Row(
                       children: [
                         const Text(
@@ -717,18 +832,28 @@ userid:widget.userId,
                             color: Colors.black,
                           ),
                         ),
-                        Icon(Icons.arrow_circle_right,size: 20, color: ColorUtils.primarycolor(),),
+                        Icon(
+                          Icons.arrow_circle_right,
+                          size: 20,
+                          color: ColorUtils.primarycolor(),
+                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 5,),
+                  const SizedBox(height: 5),
                   Padding(
-                    padding: const EdgeInsets.symmetric( horizontal: 15),
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
                     child: GestureDetector(
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) =>  SearchScreen(userid: widget.userId,title:"Search Parking" ,)),
+                          MaterialPageRoute(
+                            builder:
+                                (context) => SearchScreen(
+                                  userid: widget.userId,
+                                  title: "Search Parking",
+                                ),
+                          ),
                         );
                       },
                       child: TextFormField(
@@ -736,7 +861,13 @@ userid:widget.userId,
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) =>  SearchScreen(userid: widget.userId,title:"Search Parking" )),
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => SearchScreen(
+                                    userid: widget.userId,
+                                    title: "Search Parking",
+                                  ),
+                            ),
                           );
                         },
                         decoration: InputDecoration(
@@ -767,7 +898,13 @@ userid:widget.userId,
                             onTap: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (context) =>  SearchScreen(userid: widget.userId,title:"Search Parking")),
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) => SearchScreen(
+                                        userid: widget.userId,
+                                        title: "Search Parking",
+                                      ),
+                                ),
                               );
                             },
                             child: Icon(
@@ -779,7 +916,10 @@ userid:widget.userId,
                             maxHeight: 36,
                             maxWidth: double.infinity,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                            horizontal: 12,
+                          ),
                           hintText: 'Search Parking Locations...',
                           hintStyle: const TextStyle(
                             fontWeight: FontWeight.w300,
@@ -790,323 +930,336 @@ userid:widget.userId,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20,),
+                  const SizedBox(height: 20),
 
                   SlideTransition(
                     position: _gridSlideAnimation,
                     child: _buildGridView(), // Your existing grid view widget
                   ),
 
-                  const SizedBox(height: 20,),
+                  const SizedBox(height: 20),
                   SlideTransition(
                     position: _mapSlideAnimation,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 15),
 
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-
-
-
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-
-
-                                const SizedBox(height: 5), // Reduce space between Row and Container (adjust as needed)
-                                Row(
-                                  children: [
-                                    const Text(
-                                                        " Parking Assistance",
-                                                        style: TextStyle(
-                                                          fontWeight: FontWeight.bold,
-                                                          fontSize: 16,
-                                                          color: Colors.black,
-                                                        ),
-                                    ),
-                                    Icon(Icons.arrow_circle_right,size: 20, color: ColorUtils.primarycolor(),),
-                                  ],
-                                ),
-                                const SizedBox(height: 5),
-                                Container(
-
-                                  child: GridView.builder(
-                                    padding: const EdgeInsets.all(5),
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(), // Avoid scrolling inside a scroll
-                                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 3, // 2 items per row
-                                      crossAxisSpacing: 5,
-                                      mainAxisSpacing: 5,
-                                      childAspectRatio: 3.5, // Adjust as needed (width / height)
-                                    ),
-                                    itemCount: parkingOptions.length,
-                                    itemBuilder: (context, index) => ParkingOptionBox(
-                                      option: parkingOptions[index],
-                                      isSelected: selectedParkingOption == parkingOptions[index],
-                                      onTap: () => _handleParkingOptionSelect(parkingOptions[index]),
-                                      // textColor: Colors.black,
-                                      // textColor: Colors.black, // Make sure your widget supports this
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(
+                                height: 5,
+                              ), // Reduce space between Row and Container (adjust as needed)
+                              Row(
+                                children: [
+                                  const Text(
+                                    " Parking Assistance",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: Colors.black,
                                     ),
                                   ),
-                                )
-
-                              ],
-                            ),
-
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-
-                                const SizedBox(height: 25,),
-                                // const SizedBox(height: 5), // Reduce space between Row and Container (adjust as needed)
-                                Row(
-                                  children: [
-                                    const Text(
-                                      " Book Now, Pay Later!",
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: Colors.black,
+                                  Icon(
+                                    Icons.arrow_circle_right,
+                                    size: 20,
+                                    color: ColorUtils.primarycolor(),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              Container(
+                                child: GridView.builder(
+                                  padding: const EdgeInsets.all(5),
+                                  shrinkWrap: true,
+                                  physics:
+                                      const NeverScrollableScrollPhysics(), // Avoid scrolling inside a scroll
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 3, // 2 items per row
+                                        crossAxisSpacing: 5,
+                                        mainAxisSpacing: 5,
+                                        childAspectRatio:
+                                            3.5, // Adjust as needed (width / height)
                                       ),
-                                    ),
-                                    Icon(Icons.arrow_circle_right,size: 20, color: ColorUtils.primarycolor(),),
-                                  ],
+                                  itemCount: parkingOptions.length,
+                                  itemBuilder:
+                                      (context, index) => ParkingOptionBox(
+                                        option: parkingOptions[index],
+                                        isSelected:
+                                            selectedParkingOption ==
+                                            parkingOptions[index],
+                                        onTap:
+                                            () => _handleParkingOptionSelect(
+                                              parkingOptions[index],
+                                            ),
+                                        // textColor: Colors.black,
+                                        // textColor: Colors.black, // Make sure your widget supports this
+                                      ),
                                 ),
-                                const SizedBox(height: 5),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    // Instant Option
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => ChooseParkingPage(
-                                                userId: widget.userId,
-                                                selectedOption: 'Instant',
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        child: Container(
-                                          height: 35,
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(5),
-                                            border: Border.all(
-                                              color: Colors.grey,
-                                              width: 0.5,
-                                            ),
+                              ),
+                            ],
+                          ),
+
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 25),
+                              // const SizedBox(height: 5), // Reduce space between Row and Container (adjust as needed)
+                              Row(
+                                children: [
+                                  const Text(
+                                    " Book Now, Pay Later!",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_circle_right,
+                                    size: 20,
+                                    color: ColorUtils.primarycolor(),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  // Instant Option
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) => ChooseParkingPage(
+                                                  userId: widget.userId,
+                                                  selectedOption: 'Instant',
+                                                ),
                                           ),
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.directions_car,
-                                                size: 18,
-                                                color: ColorUtils.primarycolor(),
-                                              ),
-                                              const SizedBox(width: 5),
-                                              const Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    'Instant',
-                                                    style: TextStyle(
-                                                      color: Colors.black,
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.normal,
-                                                      height: 0.9,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    'Parking',
-                                                    style: TextStyle(
-                                                      color: Colors.black,
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.normal,
-                                                      height: 0.9,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
+                                        );
+                                      },
+                                      child: Container(
+                                        height: 35,
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(
+                                            5,
                                           ),
+                                          border: Border.all(
+                                            color: Colors.grey,
+                                            width: 0.5,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.directions_car,
+                                              size: 18,
+                                              color: ColorUtils.primarycolor(),
+                                            ),
+                                            const SizedBox(width: 5),
+                                            const Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  'Instant',
+                                                  style: TextStyle(
+                                                    color: Colors.black,
+                                                    fontSize: 10,
+                                                    fontWeight:
+                                                        FontWeight.normal,
+                                                    height: 0.9,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'Parking',
+                                                  style: TextStyle(
+                                                    color: Colors.black,
+                                                    fontSize: 10,
+                                                    fontWeight:
+                                                        FontWeight.normal,
+                                                    height: 0.9,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
+                                  ),
 
-                                    const SizedBox(width: 10),
-                                    // Schedule Option
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => ChooseParkingPage(
-                                                userId: widget.userId,
-                                                selectedOption: 'Schedule',
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        child: Container(
-                                          height: 35,
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color:  Colors.white,
-                                            borderRadius: BorderRadius.circular(5),
-                                            border: Border.all(
-                                              color: Colors.grey,
-                                              width: 0.5, // Set border width to 0.5
-                                            ),
+                                  const SizedBox(width: 10),
+                                  // Schedule Option
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) => ChooseParkingPage(
+                                                  userId: widget.userId,
+                                                  selectedOption: 'Schedule',
+                                                ),
                                           ),
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                  Icons.calendar_today,
-                                         size: 18,
-                                                  color: ColorUtils.primarycolor()
-                                              ),
-                                              const SizedBox(width: 2),
-                                              const Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    'Schedule Now',
-                                                    style: TextStyle(
-                                                      color:  Colors.black,
-                                                      fontSize: 10,
-                                                      fontWeight:  FontWeight.normal,
-                                                      height: 0.9, // Adjust this value to control spacing
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    'Park Later',
-                                                    style: TextStyle(
-                                                      color:  Colors.black,
-                                                      fontSize: 10,
-                                                      fontWeight:  FontWeight.normal,
-                                                      height: 0.9, // Same as above for consistency
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-
-                                            ],
+                                        );
+                                      },
+                                      child: Container(
+                                        height: 35,
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(
+                                            5,
                                           ),
+                                          border: Border.all(
+                                            color: Colors.grey,
+                                            width:
+                                                0.5, // Set border width to 0.5
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.calendar_today,
+                                              size: 18,
+                                              color: ColorUtils.primarycolor(),
+                                            ),
+                                            const SizedBox(width: 2),
+                                            const Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  'Schedule Now',
+                                                  style: TextStyle(
+                                                    color: Colors.black,
+                                                    fontSize: 10,
+                                                    fontWeight:
+                                                        FontWeight.normal,
+                                                    height:
+                                                        0.9, // Adjust this value to control spacing
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'Park Later',
+                                                  style: TextStyle(
+                                                    color: Colors.black,
+                                                    fontSize: 10,
+                                                    fontWeight:
+                                                        FontWeight.normal,
+                                                    height:
+                                                        0.9, // Same as above for consistency
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => ChooseParkingPage(
-                                                userId: widget.userId,
-                                                selectedOption: 'Subscription',
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        child: Container(
-                                          height: 35,
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color:  Colors.white,
-                                            borderRadius: BorderRadius.circular(5),
-                                            border: Border.all(
-                                              color: Colors.grey,
-                                              width: 0.5, // Set border width to 0.5
-                                            ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) => ChooseParkingPage(
+                                                  userId: widget.userId,
+                                                  selectedOption:
+                                                      'Subscription',
+                                                ),
                                           ),
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                  Icons.calendar_today,
-                                                color: ColorUtils.primarycolor(),
-                                                size: 18,
-                                              ),
-                                              const SizedBox(width: 2),
-                                              const Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    'Monthly',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      color:  Colors.black,
-                                                      fontWeight:  FontWeight.normal,
-                                                      height: 0.9, // Adjust this value to control spacing
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    'Parking',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      color:  Colors.black,
-                                                      fontWeight:  FontWeight.normal,
-                                                      height: 0.9, // Same as above for consistency
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-
-                                            ],
+                                        );
+                                      },
+                                      child: Container(
+                                        height: 35,
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(
+                                            5,
                                           ),
+                                          border: Border.all(
+                                            color: Colors.grey,
+                                            width:
+                                                0.5, // Set border width to 0.5
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.calendar_today,
+                                              color: ColorUtils.primarycolor(),
+                                              size: 18,
+                                            ),
+                                            const SizedBox(width: 2),
+                                            const Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  'Monthly',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.black,
+                                                    fontWeight:
+                                                        FontWeight.normal,
+                                                    height:
+                                                        0.9, // Adjust this value to control spacing
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'Parking',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.black,
+                                                    fontWeight:
+                                                        FontWeight.normal,
+                                                    height:
+                                                        0.9, // Same as above for consistency
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
+                                  ),
 
-                                    // Subscription Option
-
-                                  ],
-                                ),
-
-                              ],
-                            ),
-
-                          ],
+                                  // Subscription Option
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
 
+                  const SizedBox(height: 15),
 
-
-                  const SizedBox(height: 15,),
-
-
-
-
-                  const SizedBox(height: 15,),
-
+                  const SizedBox(height: 15),
                 ],
               ),
             ),
           ),
-
-
-
-
-
-
-
-
-
-
-
-
         ],
       ),
     );
@@ -1114,11 +1267,11 @@ userid:widget.userId,
 
   Widget _buildGridView() {
     return Padding(
-      padding: const EdgeInsets.symmetric( horizontal: 11),
+      padding: const EdgeInsets.symmetric(horizontal: 11),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric( horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
               children: [
                 const Text(
@@ -1129,7 +1282,11 @@ userid:widget.userId,
                     color: Colors.black,
                   ),
                 ),
-                Icon(Icons.arrow_circle_right,size: 20, color: ColorUtils.primarycolor(),),
+                Icon(
+                  Icons.arrow_circle_right,
+                  size: 20,
+                  color: ColorUtils.primarycolor(),
+                ),
               ],
             ),
           ),
@@ -1146,7 +1303,7 @@ userid:widget.userId,
             ),
             itemCount: ramData.length,
             itemBuilder: (context, index) {
-              return _buildGridItem(context,index);
+              return _buildGridItem(context, index);
             },
           ),
         ],
@@ -1162,60 +1319,82 @@ userid:widget.userId,
         // Navigate based on the index
         switch (index) {
           case 0: // Book Parking
-             Navigator.push(
-             context,
-              MaterialPageRoute(builder: (context) => ChooseParkingPage(userId: widget.userId,selectedOption: 'Instant')),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) => ChooseParkingPage(
+                      userId: widget.userId,
+                      selectedOption: 'Instant',
+                    ),
+              ),
             );
             break;
           case 1: // My Bookings
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => ParkingPage(userId: widget.userId,)),
+              MaterialPageRoute(
+                builder: (context) => ParkingPage(userId: widget.userId),
+              ),
             );
             break;
           case 2: // My Bookings
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) =>  BlockSpot(userId: widget.userId)),
+              MaterialPageRoute(
+                builder: (context) => BlockSpot(userId: widget.userId),
+              ),
             );
             break;
           case 3: // My Bookings
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => SearchScreen(userid: widget.userId,title:"Explore Parking Space(s)")),
+              MaterialPageRoute(
+                builder:
+                    (context) => SearchScreen(
+                      userid: widget.userId,
+                      title: "Explore Parking Space(s)",
+                    ),
+              ),
             );
             break;
           case 4: // My Bookings
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) =>  favourites( userid: widget.userId,)),
+              MaterialPageRoute(
+                builder: (context) => favourites(userid: widget.userId),
+              ),
             );
             break;
           case 5: // My Bookings
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) =>  mybusiness(
+              MaterialPageRoute(
+                builder:
+                    (context) => mybusiness(
+                      vendorId: widget.userId,
 
-                vendorId:widget.userId,
-                // username:w
-
-              )),
+                      // username:w
+                    ),
+              ),
             );
             break;
           case 6: // My Bookings
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const commercial()),
-          );
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const commercial()),
+            );
             break;
           case 7: // My Bookings
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => moreservice(userId: widget.userId,)),
-          );
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => moreservice(userId: widget.userId),
+              ),
+            );
             break;
 
-        // Add more cases for other indices if needed
+          // Add more cases for other indices if needed
           default:
             break;
         }
@@ -1243,21 +1422,22 @@ userid:widget.userId,
                 //     width: 0.5, // Border width (you can adjust this)
                 //   ),
                 // ),
-                child: ramData[index]['icon'] is String
-                    ? SvgPicture.asset(
-                  ramData[index]['icon'], // Path to the SVG
-                  height: 40, // Adjust size as needed
-                  width: 40,
-                )
-                    : CircleAvatar(
-                  radius: 26,
-                  backgroundColor: ColorUtils.primarycolor(),
-                  child: Icon(
-                    ramData[index]['icon'], // Use icon from ramData
-                    size: 28,
-                    color: Colors.white,
-                  ),
-                ),
+                child:
+                    ramData[index]['icon'] is String
+                        ? SvgPicture.asset(
+                          ramData[index]['icon'], // Path to the SVG
+                          height: 40, // Adjust size as needed
+                          width: 40,
+                        )
+                        : CircleAvatar(
+                          radius: 26,
+                          backgroundColor: ColorUtils.primarycolor(),
+                          child: Icon(
+                            ramData[index]['icon'], // Use icon from ramData
+                            size: 28,
+                            color: Colors.white,
+                          ),
+                        ),
               ),
               const SizedBox(height: 4), // Space between icon and text
               Column(
@@ -1289,10 +1469,6 @@ userid:widget.userId,
       ),
     );
   }
-
-
-
-
 }
 
 class ParkingOptionBox extends StatelessWidget {
@@ -1300,7 +1476,8 @@ class ParkingOptionBox extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
-  const ParkingOptionBox({super.key, 
+  const ParkingOptionBox({
+    super.key,
     required this.option,
     required this.onTap,
     this.isSelected = false,
@@ -1309,15 +1486,19 @@ class ParkingOptionBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Check if the option is "Filter" or "View all"
-    final isSpecialOption = option['name'] == 'Filter' || option['name'] == 'View all';
+    final isSpecialOption =
+        option['name'] == 'Filter' || option['name'] == 'View all';
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: isSpecialOption
-              ? ColorUtils.primarycolor() // Green background for Filter/View all
-              : (isSelected ? ColorUtils.primarycolor().withOpacity(0.1) : Colors.white),
+          color:
+              isSpecialOption
+                  ? ColorUtils.primarycolor() // Green background for Filter/View all
+                  : (isSelected
+                      ? ColorUtils.primarycolor().withOpacity(0.1)
+                      : Colors.white),
           border: Border.all(
             color: isSelected ? ColorUtils.primarycolor() : Colors.grey,
             width: isSelected ? 1.5 : 0.5,
@@ -1332,7 +1513,10 @@ class ParkingOptionBox extends StatelessWidget {
                 Icon(
                   option['icon'],
                   size: 16,
-                  color: isSpecialOption ? Colors.white : Colors.black, // White icon for Filter/View all
+                  color:
+                      isSpecialOption
+                          ? Colors.white
+                          : Colors.black, // White icon for Filter/View all
                 ),
               if (option['icon'] != null) const SizedBox(width: 4),
               Text(
@@ -1340,7 +1524,10 @@ class ParkingOptionBox extends StatelessWidget {
                 style: GoogleFonts.aBeeZee(
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
-                  color: isSpecialOption ? Colors.white : Colors.black, // White text for Filter/View all
+                  color:
+                      isSpecialOption
+                          ? Colors.white
+                          : Colors.black, // White text for Filter/View all
                 ),
                 semanticsLabel: option['name'],
               ),
@@ -1351,5 +1538,3 @@ class ParkingOptionBox extends StatelessWidget {
     );
   }
 }
-
-

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../config/colorcode.dart';
 
@@ -58,12 +59,12 @@ class BottomNavBar extends StatelessWidget {
         BottomNavigationBarItem(
           icon: displayImage != null && displayImage.isNotEmpty
               ? ClipOval(
-            child: Image.network(
-              displayImage,
+            child: CachedNetworkImage(
+              imageUrl: displayImage,
               width: 24,
               height: 24,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => _defaultProfileIcon(),
+              errorWidget: (context, url, error) => _defaultProfileIcon(),
             ),
           )
               : _defaultProfileIcon(),

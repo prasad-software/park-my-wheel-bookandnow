@@ -69,6 +69,7 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
   bool _slotViewEnabled = false;
   bool _valetEnabled = false;
   bool _isPineLabsEnabled = false;
+  bool _bookAndShowEnabled = true;
 
   String _defaultVehicleType = 'Car';
 
@@ -561,6 +562,7 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
           _vehicleUploadEnabled = data['vehicleUploadEnabled'] ?? false;
           _slotViewEnabled = data['slotViewEnabled'] ?? false;
           _valetEnabled = data['valetEnabled'] ?? false;
+          _bookAndShowEnabled = data['bookAndShowEnabled'] ?? true;
           if (data['valetCharge'] != null && savedCharge == null) {
             _valetChargeController.text = data['valetCharge'].toString();
           }
@@ -593,6 +595,7 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
           'slotViewEnabled': _slotViewEnabled,
           'valetEnabled': _valetEnabled,
           'valetCharge': _valetChargeController.text,
+          'bookAndShowEnabled': _bookAndShowEnabled,
         }),
       );
 
@@ -1777,8 +1780,21 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
                     },
                   ),
                 ),
-                Expanded(child: SizedBox()),
-                Expanded(child: SizedBox()),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildToggleButton(
+                    label: "Book & Show",
+                    value: _bookAndShowEnabled,
+                    onChanged: (value) {
+                      setState(() {
+                        _bookAndShowEnabled = value;
+                      });
+                      _saveToggleStates();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(child: SizedBox()),
               ],
             ),
             const SizedBox(height: 10),

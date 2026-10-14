@@ -11,6 +11,8 @@ import '../../../config/authconfig.dart';
 import '../../../config/colorcode.dart';
 import '../../../utils/sts_utils.dart';
 import '../../../pageloader.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import '../../../services/local_db_service.dart';
 
 class CustomReportScreen extends StatefulWidget {
   final String vendorid;
@@ -44,23 +46,79 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
     });
 
     try {
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+
       final start = DateFormat('dd-MM-yyyy').format(_selectedStartDateTime);
       final end = DateFormat('dd-MM-yyyy').format(_selectedEndDateTime);
-      final url = Uri.parse(
-        '${ApiConfig.baseUrl}vendor/fast-summary/${widget.vendorid}?startDate=$start&endDate=$end',
-      );
-      final response = await http.get(url);
-      if (response.statusCode != 200) {
-        throw Exception('Failed to load bookings (${response.statusCode})');
+
+      List<Bookingdata> list = [];
+      bool fetchSuccess = false;
+
+      if (isOnline) {
+        try {
+          final url = Uri.parse(
+            '${ApiConfig.baseUrl}vendor/fast-summary/${widget.vendorid}?startDate=$start&endDate=$end',
+          );
+          final response = await http
+              .get(url)
+              .timeout(const Duration(seconds: 10));
+          if (response.statusCode == 200) {
+            final Map<String, dynamic> jsonResponse = json.decode(
+              response.body,
+            );
+            final List<dynamic>? data = jsonResponse['bookings'];
+            final List<Map<String, dynamic>> mapsList =
+                (data ?? [])
+                    .whereType<Map>()
+                    .map((m) => Map<String, dynamic>.from(m))
+                    .toList();
+            LocalDbService.applyPendingExitsToMaps(mapsList);
+            list = mapsList.map((m) => Bookingdata.fromJson(m)).toList();
+            fetchSuccess = true;
+          }
+        } catch (e) {
+          print(
+            "Online fetch failed in CustomReport, falling back to cache: $e",
+          );
+        }
       }
 
-      final Map<String, dynamic> jsonResponse = json.decode(response.body);
-      final List<dynamic>? data = jsonResponse['bookings'];
-      final list =
-          (data ?? const <dynamic>[])
-              .whereType<Map>()
+      if (!fetchSuccess) {
+        // Offline mode or fallback: Combine all cached dashboard bookings
+        List<Map<String, dynamic>> allBookingsMap =
+            LocalDbService.getAllCachedDashboardBookings(widget.vendorid);
+
+        Map<String, Map<String, dynamic>> combined = {};
+        for (var b in allBookingsMap) {
+          String id = b['_id']?.toString() ?? b['id']?.toString() ?? '';
+          if (id.isNotEmpty) combined[id] = b;
+        }
+
+        final mapsList = combined.values.toList();
+        LocalDbService.applyPendingExitsToMaps(mapsList);
+        list = mapsList.map((m) => Bookingdata.fromJson(m)).toList();
+      }
+
+      // ALWAYS append pending offline bookings, since they might not be on the server yet
+      List<Map<String, dynamic>> pendingOffline =
+          LocalDbService.getOfflineBookingsForVendor(widget.vendorid, '');
+      List<Bookingdata> pendingList =
+          pendingOffline
               .map((m) => Bookingdata.fromJson(Map<String, dynamic>.from(m)))
               .toList();
+
+      Map<String, Bookingdata> finalMap = {};
+      for (var b in pendingList) {
+        if (b.id.isNotEmpty) finalMap[b.id] = b;
+      }
+      for (var b in list) {
+        if (b.id.isNotEmpty) finalMap[b.id] = b;
+      }
+
+      list = finalMap.values.toList();
 
       if (!mounted) return;
       setState(() {
@@ -118,7 +176,7 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
       }
 
       bool isExitedInRange = false;
-      if (exitDateTime != null) {
+      if (exitDateTime != null && b.status.trim().toUpperCase() != 'PARKED') {
         isExitedInRange =
             (exitDateTime.isAtSameMomentAs(_selectedStartDateTime) ||
                 exitDateTime.isAfter(_selectedStartDateTime)) &&
@@ -126,7 +184,17 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
                 exitDateTime.isBefore(_selectedEndDateTime));
       }
 
-      return isBookedInRange || isExitedInRange;
+      final sts = b.sts.trim().toLowerCase();
+      final isPassOrSub =
+          isSubscriptionSts(sts) ||
+          RegExp(r'^\d+(?:hr|h)$', caseSensitive: false).hasMatch(sts);
+
+      if (isPassOrSub) {
+        return isBookedInRange;
+      }
+
+      // For instant / hourly bookings: only include in summary after exit
+      return isExitedInRange;
     }).toList();
   }
 
@@ -137,6 +205,13 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
     final isPassOrSub =
         isSubscriptionSts(sts) ||
         RegExp(r'^\d+(?:hr|h)$', caseSensitive: false).hasMatch(sts);
+
+    // If it is a purely hourly/instant booking and hasn't been completed yet,
+    // the amount hasn't been collected. Wait for exit.
+    if (!isPassOrSub && b.status.trim().toUpperCase() == 'PARKED') {
+      return 0.0;
+    }
+
     final valetAmount =
         isPassOrSub ? 0.0 : (double.tryParse(b.valetCharge) ?? 0.0);
     return baseAmount + valetAmount;
@@ -147,6 +222,43 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
     for (final b in list) {
       final amount = _amountForBooking(b);
       final sts = b.sts.trim().toLowerCase();
+      final isPassOrSub =
+          isSubscriptionSts(sts) ||
+          RegExp(r'^\d+(?:hr|h)$', caseSensitive: false).hasMatch(sts);
+
+      final bookingDateTime = _combineDateTime(b.bookingDate, b.bookingTime);
+      final exitDateTime =
+          (b.exitvehicledate.trim().isNotEmpty &&
+                  b.exitvehicletime.trim().isNotEmpty)
+              ? _combineDateTime(b.exitvehicledate, b.exitvehicletime)
+              : null;
+
+      bool isBookedInRange = false;
+      if (bookingDateTime != null) {
+        isBookedInRange =
+            (bookingDateTime.isAtSameMomentAs(_selectedStartDateTime) ||
+                bookingDateTime.isAfter(_selectedStartDateTime)) &&
+            (bookingDateTime.isAtSameMomentAs(_selectedEndDateTime) ||
+                bookingDateTime.isBefore(_selectedEndDateTime));
+      }
+
+      bool isExitedInRange = false;
+      if (exitDateTime != null && b.status.trim().toUpperCase() != 'PARKED') {
+        isExitedInRange =
+            (exitDateTime.isAtSameMomentAs(_selectedStartDateTime) ||
+                exitDateTime.isAfter(_selectedStartDateTime)) &&
+            (exitDateTime.isAtSameMomentAs(_selectedEndDateTime) ||
+                exitDateTime.isBefore(_selectedEndDateTime));
+      }
+
+      if (isPassOrSub && !isBookedInRange) {
+        continue;
+      }
+
+      // Hourly is paid on exit; only include count and amount after vehicle has exited
+      if (!isPassOrSub && !isExitedInRange) {
+        continue;
+      }
 
       if (RegExp(r'^\d+(?:hr|h)$', caseSensitive: false).hasMatch(sts)) {
         final hours = int.tryParse(sts.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
@@ -349,7 +461,10 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
               color: ColorUtils.primarycolor(),
               fontWeight: FontWeight.bold,
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 12,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade400),
@@ -361,11 +476,7 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
           ),
           child: Row(
             children: [
-              Icon(
-                Icons.calendar_month,
-                size: 16,
-                color: Colors.grey.shade700,
-              ),
+              Icon(Icons.calendar_month, size: 16, color: Colors.grey.shade700),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -438,7 +549,10 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
               : _error != null
               ? Center(child: Text(_error!))
               : Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4.0,
+                  vertical: 16.0,
+                ),
                 child: Column(
                   children: [
                     Row(
@@ -588,7 +702,8 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
                                 width: double.infinity,
                                 height: 48,
                                 child: ElevatedButton.icon(
-                                  onPressed: () => _printReport(filtered, totals),
+                                  onPressed:
+                                      () => _printReport(filtered, totals),
                                   icon: const Icon(Icons.print, size: 20),
                                   label: Text(
                                     'Print Report',

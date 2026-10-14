@@ -20,7 +20,7 @@
 
 
     <application
-        android:label="ParkMyWheels"
+        android:label="Park My Wheels"
         android:name="${applicationName}"
         android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher">
@@ -57,6 +57,9 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyBU1oEy4G_LcoqgrdMG9gX9GMHwpeXDNiI"/>
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

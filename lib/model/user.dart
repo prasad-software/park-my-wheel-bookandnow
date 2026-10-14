@@ -21,7 +21,7 @@ class User {
       username: json['userName'] ?? '', // Provide a default value for null
       mobileNumber: json['userMobile'] ?? '', // Provide a default value for null
       email: json['userEmail'] ?? '', // Provide a default value for null
-      imageUrl: json['image'],
+      imageUrl: json['image'] ?? '', // Provide a default value for null
       vehicleNumber: json['vehicleNo'] ?? '', // Provide a default value for null
     );
   }

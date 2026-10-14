@@ -20,6 +20,8 @@ import '../parking/parking.dart';
 import '../splashregister/register.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:cached_network_image/cached_network_image.dart';
+
 class CustomDrawer extends StatefulWidget  {
   final String username;
   final String imageUrl;
@@ -87,26 +89,22 @@ class _CustomDrawerState extends State<CustomDrawer> with SingleTickerProviderSt
                 radius: 30,
                 backgroundColor: Colors.grey[300],
                 child: widget.imageUrl.isNotEmpty
-                    ? ClipOval(
-                  child: Image.network(
-                    widget.imageUrl,
-                    fit: BoxFit.cover,
-                    width: 65, // Adjust the size to match the CircleAvatar radius
-                    height: 65, // Adjust the size to match the CircleAvatar radius
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) {
-                        return child; // Image has finished loading
-                      } else {
-                        return Center(
+                  ? ClipOval(
+                      child: CachedNetworkImage(
+                        imageUrl: widget.imageUrl,
+                        fit: BoxFit.cover,
+                        width: 65,
+                        height: 65,
+                        placeholder: (context, url) => Center(
                           child: Padding(
-                            padding: const EdgeInsets.all(40.0), // Adjust padding as needed
+                            padding: const EdgeInsets.all(40.0),
                             child: Image.asset('assets/gifload.gif'),
                           ),
-                        );                        }
-                    },
-                  ),
-                )
-                    : const Icon(Icons.person, size: 40, color: Colors.black54),
+                        ),
+                        errorWidget: (context, url, error) => const Icon(Icons.person, size: 40, color: Colors.black54),
+                      ),
+                    )
+                  : const Icon(Icons.person, size: 40, color: Colors.black54),
               ),
             
               const SizedBox(width: 20),

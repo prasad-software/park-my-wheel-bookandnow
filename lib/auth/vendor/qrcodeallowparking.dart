@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:mywheels/services/local_db_service.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -34,7 +36,11 @@ final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 class qrcodeallowpark extends StatefulWidget {
   final String vendorid;
   final bool isFromNewBooking;
-  const qrcodeallowpark({super.key, required this.vendorid, this.isFromNewBooking = false});
+  const qrcodeallowpark({
+    super.key,
+    required this.vendorid,
+    this.isFromNewBooking = false,
+  });
 
   @override
   _qrcodeallowparkState createState() => _qrcodeallowparkState();
@@ -397,102 +403,105 @@ class _qrcodeallowparkState extends State<qrcodeallowpark>
         return false;
       },
       child: Scaffold(
-      backgroundColor: ColorUtils.secondarycolor(),
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            if (widget.isFromNewBooking) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => vendordashScreen(vendorid: widget.vendorid),
-                ),
-                (Route<dynamic> route) => false,
-              );
-            }
-          },
-        ),
-        titleSpacing: 15,
-        automaticallyImplyLeading: false,
         backgroundColor: ColorUtils.secondarycolor(),
-        title: Text(
-          'Entry Scan',
-          style: GoogleFonts.poppins(color: Colors.black, fontSize: 18),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              _isControllerInitialized && cameraController.torchEnabled
-                  ? Icons.flash_on
-                  : Icons.flash_off,
-              color: Colors.black,
-            ),
-            onPressed: _toggleFlashlight,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () {
+              if (widget.isFromNewBooking) {
+                Navigator.pop(context);
+              } else {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) =>
+                            vendordashScreen(vendorid: widget.vendorid),
+                  ),
+                  (Route<dynamic> route) => false,
+                );
+              }
+            },
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            if (isCameraPermissionGranted && _isControllerInitialized)
-              MobileScanner(
-                controller: cameraController,
-                onDetect: _handleBarcode,
-              )
-            else
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        isCameraPermissionGranted
-                            ? 'Camera initialization failed'
-                            : 'Camera access is required to scan QR codes',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: () async {
-                        await requestCameraPermission();
-                        if (isCameraPermissionGranted && !isScannerRunning) {
-                          await _startScanner();
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(5),
-                          side: BorderSide(color: ColorUtils.primarycolor()),
-                        ),
-                        backgroundColor: Colors.white,
-                        foregroundColor: ColorUtils.primarycolor(),
-                        elevation: 2,
-                      ),
-                      child: const Text('Grant Camera Permission'),
-                    ),
-                    if (_isPermanentlyDenied)
-                      const TextButton(
-                        onPressed: openAppSettings,
-                        child: Text('Open Settings to Enable'),
-                      ),
-                  ],
-                ),
+          titleSpacing: 15,
+          automaticallyImplyLeading: false,
+          backgroundColor: ColorUtils.secondarycolor(),
+          title: Text(
+            'Entry Scan',
+            style: GoogleFonts.poppins(color: Colors.black, fontSize: 18),
+          ),
+          actions: [
+            IconButton(
+              icon: Icon(
+                _isControllerInitialized && cameraController.torchEnabled
+                    ? Icons.flash_on
+                    : Icons.flash_off,
+                color: Colors.black,
               ),
+              onPressed: _toggleFlashlight,
+            ),
           ],
         ),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              if (isCameraPermissionGranted && _isControllerInitialized)
+                MobileScanner(
+                  controller: cameraController,
+                  onDetect: _handleBarcode,
+                )
+              else
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          isCameraPermissionGranted
+                              ? 'Camera initialization failed'
+                              : 'Camera access is required to scan QR codes',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: () async {
+                          await requestCameraPermission();
+                          if (isCameraPermissionGranted && !isScannerRunning) {
+                            await _startScanner();
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5),
+                            side: BorderSide(color: ColorUtils.primarycolor()),
+                          ),
+                          backgroundColor: Colors.white,
+                          foregroundColor: ColorUtils.primarycolor(),
+                          elevation: 2,
+                        ),
+                        child: const Text('Grant Camera Permission'),
+                      ),
+                      if (_isPermanentlyDenied)
+                        const TextButton(
+                          onPressed: openAppSettings,
+                          child: Text('Open Settings to Enable'),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        bottomNavigationBar: BottomNavBar(
+          selectedIndex: _selectedIndex,
+          onTabChange: _onTabChange,
+          menuImageUrl: _menuImageUrl,
+        ),
       ),
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: _selectedIndex,
-        onTabChange: _onTabChange,
-        menuImageUrl: _menuImageUrl,
-      ),
-    ));
+    );
   }
 }
 
@@ -726,6 +735,26 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         charges = [];
       });
     } finally {
+      if (charges.isEmpty) {
+        final url =
+            '${ApiConfig.baseUrl}vendor/fetchbookcharge/$vendorId/$selectedCarType';
+        var cached = LocalDbService.getCachedApiResponse(url);
+        if (cached != null) {
+          final data = cached;
+          if (data is List) {
+            setState(() {
+              charges = List<Map<String, dynamic>>.from(data);
+            });
+          } else if (data['vendor'] != null &&
+              data['vendor']['charges'] != null) {
+            setState(() {
+              charges = List<Map<String, dynamic>>.from(
+                data['vendor']['charges'],
+              );
+            });
+          }
+        }
+      }
       setState(() {
         isLoading = false;
       });
@@ -874,7 +903,27 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       final url =
           '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}';
       print('Fetching vendor data from: $url');
-      final response = await http.get(Uri.parse(url));
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+
+      late http.Response response;
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(url);
+        if (cached != null) {
+          response = http.Response(jsonEncode(cached), 200);
+        } else {
+          response = http.Response('{}', 500);
+        }
+      } else {
+        response = await http.get(Uri.parse(url));
+        if (response.statusCode == 200) {
+          try {
+            LocalDbService.cacheApiResponse(url, jsonDecode(response.body));
+          } catch (_) {}
+        }
+      }
       print('Vendor data response status: ${response.statusCode}');
       print('Vendor data response body: ${response.body}');
 
@@ -974,6 +1023,39 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       });
       print('Exception in _fetchBookingDetails: $error');
     }
+    if (bookingDetails != null) return;
+    print('Falling back to local cache for booking details.');
+    final allBookings = LocalDbService.getAllCachedDashboardBookings(
+      widget.vendorid,
+    );
+    final offlineBookings = LocalDbService.getOfflineBookingsForVendor(
+      widget.vendorid,
+      '',
+    );
+    final combinedList = [...allBookings];
+    for (var offlineBooking in offlineBookings) {
+      if (!combinedList.any((b) => (b['_id'] == offlineBooking['_id']))) {
+        combinedList.add(offlineBooking);
+      }
+    }
+    final match = combinedList.firstWhere(
+      (b) =>
+          (b['_id']?.toString() ?? b['id']?.toString() ?? '') ==
+          widget.bookingId,
+      orElse: () => <String, dynamic>{},
+    );
+    if (match.isNotEmpty) {
+      setState(() {
+        bookingDetails = match;
+        errorMessage = null;
+        isLoading = false;
+      });
+    } else if (bookingDetails == null) {
+      setState(() {
+        errorMessage = 'Wrong QR code or booking not synced yet.';
+        isLoading = false;
+      });
+    }
   }
 
   Future<void> _allowParking() async {
@@ -983,11 +1065,37 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         'dd-MM-yyyy',
       ).format(now); // e.g., "07-07-2025"
       final parkedTime = DateFormat('hh:mm a').format(now); // e.g., "04:54 PM"
-      final response = await http.put(
-        Uri.parse('${ApiConfig.baseUrl}vendor/qrallowpark/${widget.bookingId}'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'parkedDate': parkedDate, 'parkedTime': parkedTime}),
-      );
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+
+      http.Response response;
+      if (!isOnline) {
+        await LocalDbService.addPendingAction({
+          'type': 'ENTRY_SCAN',
+          'payload': {
+            'parkedDate': parkedDate,
+            'parkedTime': parkedTime,
+            'bookingId': widget.bookingId,
+          },
+        });
+        response = http.Response(
+          '{"success": true, "message": "Offline: Vehicle entry saved locally"}',
+          200,
+        );
+      } else {
+        response = await http.put(
+          Uri.parse(
+            '${ApiConfig.baseUrl}vendor/qrallowpark/${widget.bookingId}',
+          ),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'parkedDate': parkedDate,
+            'parkedTime': parkedTime,
+          }),
+        );
+      }
 
       final data = json.decode(response.body);
       if (response.statusCode == 200 && data['success']) {
@@ -1781,7 +1889,10 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                                             'Vendor',
                                         bookingId: bId,
                                         invoiceId:
-                                            bookingDetails!['invoiceId']
+                                            (bookingDetails!['invoiceId'] ??
+                                                    bookingDetails!['invoiceid'] ??
+                                                    bookingDetails!['invoice'] ??
+                                                    '')
                                                 ?.toString(),
                                         vehicleType:
                                             bookingDetails!['vehicleType'] ??
@@ -2263,6 +2374,110 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
     });
   }
 
+  String _getOfflineAmount(Map<String, dynamic> vehicle) {
+    try {
+      final vendorId = vehicle['vendorId']?.toString() ?? widget.vendorid;
+      final vehicleType = vehicle['vehicleType']?.toString() ?? '';
+      if (vendorId.isEmpty || vehicleType.isEmpty)
+        return vehicle['amount']?.toString() ?? '0';
+
+      final parkedDateStr = vehicle['parkingDate']?.toString() ?? '';
+      final parkedTimeStr = vehicle['parkingTime']?.toString() ?? '';
+      if (parkedDateStr.isEmpty || parkedTimeStr.isEmpty)
+        return vehicle['amount']?.toString() ?? '0';
+
+      final parts = parkedDateStr.split('-');
+      if (parts.length != 3) return vehicle['amount']?.toString() ?? '0';
+      int day = int.tryParse(parts[0]) ?? 1;
+      int month = int.tryParse(parts[1]) ?? 1;
+      int year = int.tryParse(parts[2]) ?? 2000;
+
+      final timeParts = parkedTimeStr.split(' ');
+      if (timeParts.isEmpty) return vehicle['amount']?.toString() ?? '0';
+      final hm = timeParts[0].split(':');
+      int hour = int.tryParse(hm.isNotEmpty ? hm[0] : '0') ?? 0;
+      int minute = int.tryParse(hm.length > 1 ? hm[1] : '0') ?? 0;
+      if (timeParts.length > 1 &&
+          timeParts[1].toUpperCase() == 'PM' &&
+          hour < 12)
+        hour += 12;
+      if (timeParts.length > 1 &&
+          timeParts[1].toUpperCase() == 'AM' &&
+          hour == 12)
+        hour = 0;
+
+      final parkedDateTime = DateTime(year, month, day, hour, minute);
+      var duration = DateTime.now().difference(parkedDateTime);
+      if (duration.isNegative) duration = Duration.zero;
+
+      final totalHours = duration.inMinutes / 60.0;
+      int ceilHours = totalHours.ceil();
+      if (ceilHours < 1) ceilHours = 1;
+
+      final apiUrl = '${ApiConfig.baseUrl}vendor/details/$vendorId';
+      final cached = LocalDbService.getCachedApiResponse(apiUrl);
+      List<dynamic> charges = [];
+      if (cached != null && cached is Map) {
+        if (vehicleType.toLowerCase() == 'car')
+          charges = cached['cartemp'] ?? [];
+        else if (vehicleType.toLowerCase() == 'bike')
+          charges = cached['biketemp'] ?? [];
+        else
+          charges = cached['otherstemp'] ?? [];
+      }
+      if (charges.isEmpty) return vehicle['amount']?.toString() ?? '0';
+
+      double calculatedAmt = 0.0;
+      if (ceilHours <= 1) {
+        final firstHour = charges.firstWhere(
+          (c) =>
+              c is Map &&
+              c['type'].toString().toLowerCase().trim().contains('0 to 1'),
+          orElse: () => null,
+        );
+        calculatedAmt =
+            firstHour != null
+                ? (double.tryParse(firstHour['amount'].toString()) ?? 0.0)
+                : 0.0;
+      } else {
+        final firstHour = charges.firstWhere(
+          (c) =>
+              c is Map &&
+              c['type'].toString().toLowerCase().trim().contains('0 to 1'),
+          orElse: () => null,
+        );
+        calculatedAmt =
+            firstHour != null
+                ? (double.tryParse(firstHour['amount'].toString()) ?? 0.0)
+                : 0.0;
+        final remainingHours = ceilHours - 1;
+        if (remainingHours > 0) {
+          final addCharge = charges.firstWhere(
+            (c) =>
+                c is Map &&
+                c['type'].toString().toLowerCase().trim().contains(
+                  'additional',
+                ),
+            orElse: () => null,
+          );
+          if (addCharge != null) {
+            final addMatch = RegExp(
+              r'additional (\d+)',
+            ).firstMatch(addCharge['type'].toString().toLowerCase().trim());
+            int addHours = addMatch != null ? int.parse(addMatch.group(1)!) : 1;
+            double addAmt =
+                double.tryParse(addCharge['amount'].toString()) ?? 0.0;
+            int periods = (remainingHours / addHours).ceil();
+            calculatedAmt += (addAmt * periods);
+          }
+        }
+      }
+      return calculatedAmt.toStringAsFixed(2);
+    } catch (e) {
+      return vehicle['amount']?.toString() ?? '0';
+    }
+  }
+
   Future<void> _handleExitButtonPressed(Map<String, dynamic> vehicle) async {
     if (!mounted) return;
     if (_isCheckingExit || _isExiting) return;
@@ -2278,10 +2493,10 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
             amountStr == '0' ||
             amountStr == '0.0' ||
             amountStr == '0.00') {
-          amountStr = vehicle['amount']?.toString() ?? '0';
+          amountStr = _getOfflineAmount(vehicle);
         }
       } catch (_) {
-        amountStr = vehicle['amount']?.toString() ?? '0';
+        amountStr = _getOfflineAmount(vehicle);
       }
 
       final amountVal = double.tryParse(amountStr.trim()) ?? 0.0;
@@ -2299,7 +2514,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
               context,
               MaterialPageRoute(
                 builder:
-                    (context) => vendorChooseParkingPage(vendorid: widget.vendorid),
+                    (context) => vendordashScreen(vendorid: widget.vendorid),
               ),
               (Route<dynamic> route) => false,
             );
@@ -2341,10 +2556,15 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                         vehicle['vendorId']?.toString() ?? widget.vendorid,
                     bookType: vehicle['bookingType']?.toString() ?? '',
                     goToBookingOnExit: !widget.isFromNewBooking,
-                    onExitSuccess: widget.isFromNewBooking ? () {
-                      Navigator.pop(context); // pop BookingDetailsPage
-                      Navigator.pop(context); // pop qrcodeallowpark page
-                    } : null,
+                    onExitSuccess:
+                        widget.isFromNewBooking
+                            ? () {
+                              Navigator.pop(context); // pop BookingDetailsPage
+                              Navigator.pop(
+                                context,
+                              ); // pop qrcodeallowpark page
+                            }
+                            : null,
                   ),
                 );
               },
@@ -2380,10 +2600,10 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
             currentAmount == '0' ||
             currentAmount == '0.0' ||
             currentAmount == '0.00') {
-          currentAmount = vehicle['amount']?.toString() ?? '0';
+          currentAmount = _getOfflineAmount(vehicle);
         }
       } catch (e) {
-        currentAmount = vehicle['amount']?.toString() ?? '0';
+        currentAmount = _getOfflineAmount(vehicle);
       }
 
       if (!mounted) return;
@@ -2392,7 +2612,12 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
           context: context,
           vendorName: vehicle['vendorName'] ?? 'Vendor',
           bookingId: bookingId,
-          invoiceId: vehicle['invoiceId']?.toString(),
+          invoiceId:
+              (vehicle['invoiceId'] ??
+                      vehicle['invoiceid'] ??
+                      vehicle['invoice'] ??
+                      '')
+                  .toString(),
           vehicleType: vehicle['vehicleType'] ?? '',
           vehicleNumber: vehicle['vehicleNumber'] ?? '',
           parkingDate: vehicle['parkingDate'] ?? '',
@@ -2427,8 +2652,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(
-              builder:
-                  (context) => vendorChooseParkingPage(vendorid: widget.vendorid),
+              builder: (context) => vendordashScreen(vendorid: widget.vendorid),
             ),
             (Route<dynamic> route) => false,
           );
@@ -2501,13 +2725,44 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         }
       }
 
-      final response = await http
-          .put(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(requestBody),
-          )
-          .timeout(_exitApiTimeout);
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+
+      http.Response response;
+      if (!isOnline) {
+        await LocalDbService.addPendingAction({
+          'type': 'EXIT_BOOKING',
+          'payload': {
+            'bookingId': bookingId,
+            'amount': parkingCharge,
+            'hour': formattedDuration,
+            'paymentMode': selectedPaymentMode,
+          },
+        });
+        await LocalDbService.markBookingCompletedOffline(
+          bookingId,
+          amount:
+              requestBody['totalamout'] != null
+                  ? (double.tryParse(requestBody['totalamout'].toString()) ??
+                      parkingCharge)
+                  : parkingCharge,
+          paymentMode: selectedPaymentMode,
+        );
+        response = http.Response(
+          '{"success": true, "message": "Offline: Vehicle exited successfully"}',
+          200,
+        );
+      } else {
+        response = await http
+            .put(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode(requestBody),
+            )
+            .timeout(_exitApiTimeout);
+      }
 
       if (response.statusCode == 200) {
         if (mounted) {

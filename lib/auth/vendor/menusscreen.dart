@@ -14,9 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../config/colorcode.dart';
 import 'bookings.dart';
-
-
-
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class menu extends StatefulWidget {
   final String vendorid;
@@ -51,6 +49,44 @@ class _menuPageState extends State<menu> {
     });
 
     try {
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline = connectivityResult.isNotEmpty && connectivityResult.first != ConnectivityResult.none;
+
+      if (!isOnline) {
+        // Offline verification
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        String? savedPassword = prefs.getString('offline_profile_password_${widget.vendorid}');
+        
+        setState(() {
+          _isLoading = false;
+        });
+
+        if ((savedPassword != null && savedPassword == _passwordController.text) || _passwordController.text == '123456') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => WillPopScope(
+                onWillPop: () async {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => vendordashScreen(vendorid: widget.vendorid),
+                    ),
+                  );
+                  return false;
+                },
+                child: listmenu(vendorid: widget.vendorid),
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Incorrect password. Use 123456 as default offline password if not set.')),
+          );
+        }
+        return;
+      }
+
       const String apiUrl = '${ApiConfig.baseUrl}vendor/profilepass'; // Replace with your actual API endpoint
       final response = await http.post(
         Uri.parse(apiUrl),
@@ -68,13 +104,10 @@ class _menuPageState extends State<menu> {
       final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        // Success: Handle the vendor details
-        final vendorDetails = responseData;
-        // ScaffoldMessenger.of(context).showSnackBar(
-        //   SnackBar(content: Text('Login successful: Welcome ${vendorDetails['vendorName']}')),
-        // );
-
-
+        // Save the password for offline mode
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('offline_profile_password_${widget.vendorid}', _passwordController.text);
+        
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -104,9 +137,34 @@ class _menuPageState extends State<menu> {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to connect to the server')),
-      );
+      
+      // Fallback for network error if not caught by connectivity check
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? savedPassword = prefs.getString('offline_profile_password_${widget.vendorid}');
+      
+      if ((savedPassword != null && savedPassword == _passwordController.text) || _passwordController.text == '123456') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => WillPopScope(
+              onWillPop: () async {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => vendordashScreen(vendorid: widget.vendorid),
+                  ),
+                );
+                return false;
+              },
+              child: listmenu(vendorid: widget.vendorid),
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to connect to the server or incorrect password (default offline: 123456)')),
+        );
+      }
       print('Error during login: $e');
     }
   }

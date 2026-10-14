@@ -6,6 +6,7 @@ import 'dart:ui';
 import 'package:animated_toggle_switch/animated_toggle_switch.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:bottom_picker/bottom_picker.dart';
 import 'package:bottom_picker/resources/arrays.dart';
@@ -22,6 +23,9 @@ import 'package:mywheels/config/colorcode.dart';
 import 'package:http/http.dart' as http;
 import 'package:mywheels/pageloader.dart';
 import 'dart:convert';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:mywheels/services/local_db_service.dart';
+import 'package:mywheels/services/pinelabs_print_helper.dart';
 import '../customer/parking/bookparking.dart';
 import 'menus/parkingchart.dart';
 import 'upi_payment_qr.dart';
@@ -55,11 +59,12 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
   bool _isCheckingSlots = false;
 
   // Toggle states for Book, Print, Exit, and Vehicle Upload buttons
-  bool _bookEnabled = false;
-  bool _printEnabled = false;
-  bool _exitEnabled = false;
-  bool _vehicleUploadEnabled = false;
-  bool _slotViewEnabled = false;
+  bool _bookEnabled = true;
+  bool _printEnabled = true;
+  bool _exitEnabled = true;
+  bool _vehicleUploadEnabled = true;
+  bool _slotViewEnabled = true;
+  bool _bookAndShowEnabled = true;
   bool _valetEnabled = false;
   double _valetChargeSetting = 0.0;
   bool _showOptionalInfo = false;
@@ -83,11 +88,39 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
 
   Future<void> _fetchValetDrivers() async {
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${ApiConfig.baseUrl}vendor/valet-drivers/${widget.vendorid}',
-        ),
-      );
+      late http.Response response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(
+          Uri.parse(
+            '${ApiConfig.baseUrl}vendor/valet-drivers/${widget.vendorid}',
+          ).toString(),
+        );
+        if (cached != null) {
+          response = http.Response(jsonEncode(cached), 200);
+        } else {
+          response = http.Response('{}', 500);
+        }
+      } else {
+        response = await http.get(
+          Uri.parse(
+            '${ApiConfig.baseUrl}vendor/valet-drivers/${widget.vendorid}',
+          ),
+        );
+        if (response.statusCode == 200) {
+          try {
+            LocalDbService.cacheApiResponse(
+              Uri.parse(
+                '${ApiConfig.baseUrl}vendor/valet-drivers/${widget.vendorid}',
+              ).toString(),
+              jsonDecode(response.body),
+            );
+          } catch (_) {}
+        }
+      }
       print('Valet Drivers API Status: ${response.statusCode}');
       print('Valet Drivers API Response: ${response.body}');
 
@@ -121,11 +154,39 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     try {
       print('Fetching data for vendor ID: ${widget.vendorid}');
 
-      final response = await http.get(
-        Uri.parse(
-          '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}',
-        ),
-      );
+      late http.Response response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(
+          Uri.parse(
+            '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}',
+          ).toString(),
+        );
+        if (cached != null) {
+          response = http.Response(jsonEncode(cached), 200);
+        } else {
+          response = http.Response('{}', 500);
+        }
+      } else {
+        response = await http.get(
+          Uri.parse(
+            '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}',
+          ),
+        );
+        if (response.statusCode == 200) {
+          try {
+            LocalDbService.cacheApiResponse(
+              Uri.parse(
+                '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}',
+              ).toString(),
+              jsonDecode(response.body),
+            );
+          } catch (_) {}
+        }
+      }
 
       print('Response Status Code: ${response.statusCode}');
       print('Response Body: ${response.body}');
@@ -173,11 +234,43 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     });
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${ApiConfig.baseUrl}vendor/availableslots/${widget.vendorid}',
-        ),
-      );
+      late http.Response response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(
+          Uri.parse(
+            '${ApiConfig.baseUrl}vendor/availableslots/${widget.vendorid}',
+          ).toString(),
+        );
+        if (cached != null) {
+          response = http.Response(jsonEncode(cached), 200);
+        } else {
+          // Offline with no cache: provide generous defaults so bookings aren't blocked
+          response = http.Response(
+            jsonEncode({'Cars': 999, 'Bikes': 999, 'Others': 999}),
+            200,
+          );
+        }
+      } else {
+        response = await http.get(
+          Uri.parse(
+            '${ApiConfig.baseUrl}vendor/availableslots/${widget.vendorid}',
+          ),
+        );
+        if (response.statusCode == 200) {
+          try {
+            LocalDbService.cacheApiResponse(
+              Uri.parse(
+                '${ApiConfig.baseUrl}vendor/availableslots/${widget.vendorid}',
+              ).toString(),
+              jsonDecode(response.body),
+            );
+          } catch (_) {}
+        }
+      }
 
       if (response.statusCode == 200) {
         setState(() {
@@ -201,21 +294,49 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
   // Fetch toggle states from backend
   Future<void> _fetchToggleStates() async {
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${ApiConfig.baseUrl}vendor/get-toggle-states/${widget.vendorid}',
-        ),
-      );
+      late http.Response response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(
+          Uri.parse(
+            '${ApiConfig.baseUrl}vendor/get-toggle-states/${widget.vendorid}',
+          ).toString(),
+        );
+        if (cached != null) {
+          response = http.Response(jsonEncode(cached), 200);
+        } else {
+          response = http.Response('{}', 500);
+        }
+      } else {
+        response = await http.get(
+          Uri.parse(
+            '${ApiConfig.baseUrl}vendor/get-toggle-states/${widget.vendorid}',
+          ),
+        );
+        if (response.statusCode == 200) {
+          try {
+            LocalDbService.cacheApiResponse(
+              Uri.parse(
+                '${ApiConfig.baseUrl}vendor/get-toggle-states/${widget.vendorid}',
+              ).toString(),
+              jsonDecode(response.body),
+            );
+          } catch (_) {}
+        }
+      }
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         setState(() {
-          _bookEnabled =
-              true; // Force enabled to recover from accidental overwrite
-          _printEnabled = true; // Force enabled
-          _exitEnabled = true; // Force enabled
-          _vehicleUploadEnabled = true; // Force enabled
-          _slotViewEnabled = true; // Force enabled
+          _bookEnabled = data['bookEnabled'] ?? true;
+          _printEnabled = data['printEnabled'] ?? true;
+          _exitEnabled = data['exitEnabled'] ?? true;
+          _vehicleUploadEnabled = data['vehicleUploadEnabled'] ?? true;
+          _slotViewEnabled = data['slotViewEnabled'] ?? true;
+          _bookAndShowEnabled = data['bookAndShowEnabled'] ?? true;
           _valetEnabled = data['valetEnabled'] ?? false;
           _valetChargeSetting =
               double.tryParse(data['valetCharge']?.toString() ?? '0') ?? 0.0;
@@ -266,6 +387,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           'exitEnabled': _exitEnabled,
           'vehicleUploadEnabled': _vehicleUploadEnabled,
           'slotViewEnabled': _slotViewEnabled,
+          'bookAndShowEnabled': _bookAndShowEnabled,
           'valetEnabled': isEnabled,
           'valetCharge': _valetChargeSetting.toString(),
         }),
@@ -297,9 +419,39 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
 
   Future<void> _fetchEnabledSettings() async {
     try {
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}vendor/fetchenable/${widget.vendorid}'),
-      );
+      late http.Response response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(
+          Uri.parse(
+            '${ApiConfig.baseUrl}vendor/fetchenable/${widget.vendorid}',
+          ).toString(),
+        );
+        if (cached != null) {
+          response = http.Response(jsonEncode(cached), 200);
+        } else {
+          response = http.Response('{}', 500);
+        }
+      } else {
+        response = await http.get(
+          Uri.parse(
+            '${ApiConfig.baseUrl}vendor/fetchenable/${widget.vendorid}',
+          ),
+        );
+        if (response.statusCode == 200) {
+          try {
+            LocalDbService.cacheApiResponse(
+              Uri.parse(
+                '${ApiConfig.baseUrl}vendor/fetchenable/${widget.vendorid}',
+              ).toString(),
+              jsonDecode(response.body),
+            );
+          } catch (_) {}
+        }
+      }
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
@@ -328,7 +480,29 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     ); // Replace with your actual API URL
 
     try {
-      final response = await http.get(url);
+      late http.Response response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(url.toString());
+        if (cached != null) {
+          response = http.Response(jsonEncode(cached), 200);
+        } else {
+          response = http.Response('{}', 500);
+        }
+      } else {
+        response = await http.get(url);
+        if (response.statusCode == 200) {
+          try {
+            LocalDbService.cacheApiResponse(
+              url.toString(),
+              jsonDecode(response.body),
+            );
+          } catch (_) {}
+        }
+      }
 
       // Print response status and body for debugging
       print('Response status: ${response.statusCode}');
@@ -423,7 +597,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           });
         });
     _vendors = fetchVendors();
-    _futureCars = ApiService().fetchCars(widget.vendorid);
+    _futureCars = fetchCars(widget.vendorid);
     final now = DateTime.now();
     datTimeController.text = _formatDateTime(now);
     dateTimeController.text = _getFormattedCurrentDateTime();
@@ -643,6 +817,358 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     }
   }
 
+  String? _extractVehicleNumberFromRecognizedText(
+    RecognizedText recognizedText,
+  ) {
+    if (recognizedText.text.trim().isEmpty) return null;
+
+    const validStates = {
+      'AN',
+      'AP',
+      'AR',
+      'AS',
+      'BR',
+      'CG',
+      'CH',
+      'DD',
+      'DN',
+      'DL',
+      'GA',
+      'GJ',
+      'HR',
+      'HP',
+      'JH',
+      'JK',
+      'KA',
+      'KL',
+      'LA',
+      'LD',
+      'MP',
+      'MH',
+      'MN',
+      'ML',
+      'MZ',
+      'NL',
+      'OD',
+      'OR',
+      'PB',
+      'PY',
+      'RJ',
+      'SK',
+      'TN',
+      'TS',
+      'TR',
+      'UP',
+      'UK',
+      'UA',
+      'WB',
+    };
+
+    const noiseWords = [
+      'INDIA',
+      'IND',
+      'HERO',
+      'HONDA',
+      'BAJAJ',
+      'TVS',
+      'YAMAHA',
+      'SUZUKI',
+      'ROYAL',
+      'ENFIELD',
+      'KTM',
+      'KAWASAKI',
+      'HYUNDAI',
+      'MARUTI',
+      'TATA',
+      'MAHINDRA',
+      'TOYOTA',
+      'KIA',
+      'RTO',
+      'DEALER',
+      'MOTORS',
+      'MOTOR',
+      'PARKING',
+      'TICKET',
+      'PUNE',
+      'MUMBAI',
+      'DELHI',
+      'BANGALORE',
+      'CHENNAI',
+      'THANK',
+      'YOU',
+      'GOVT',
+      'POLICE',
+    ];
+
+    String correctToDigits(String str) {
+      final sb = StringBuffer();
+      for (int i = 0; i < str.length; i++) {
+        final ch = str[i];
+        switch (ch) {
+          case 'O':
+          case 'D':
+          case 'Q':
+            sb.write('0');
+            break;
+          case 'I':
+          case 'L':
+            sb.write('1');
+            break;
+          case 'Z':
+            sb.write('2');
+            break;
+          case 'S':
+            sb.write('5');
+            break;
+          case 'B':
+            sb.write('8');
+            break;
+          case 'G':
+            sb.write('6');
+            break;
+          case 'T':
+            sb.write('7');
+            break;
+          default:
+            if (RegExp(r'[0-9]').hasMatch(ch)) {
+              sb.write(ch);
+            }
+        }
+      }
+      return sb.toString();
+    }
+
+    String correctToLetters(String str) {
+      final sb = StringBuffer();
+      for (int i = 0; i < str.length; i++) {
+        final ch = str[i];
+        switch (ch) {
+          case '0':
+            sb.write('O');
+            break;
+          case '1':
+            sb.write('I');
+            break;
+          case '8':
+            sb.write('B');
+            break;
+          case '5':
+            sb.write('S');
+            break;
+          case '2':
+            sb.write('Z');
+            break;
+          default:
+            if (RegExp(r'[A-Z]').hasMatch(ch)) {
+              sb.write(ch);
+            }
+        }
+      }
+      return sb.toString();
+    }
+
+    String correctToDelhiRto(String str) {
+      if (str.length >= 2 && RegExp(r'[A-Z]$').hasMatch(str)) {
+        final digits = correctToDigits(str.substring(0, str.length - 1));
+        return '$digits${str[str.length - 1]}';
+      }
+      return correctToDigits(str);
+    }
+
+    // 1. Gather all TextLines across all blocks and sort vertically by boundingBox.top
+    // This handles stacked two-line bike plates (e.g. MH 14 on top, DZ 8899 on bottom)
+    final allLines = <TextLine>[];
+    for (final block in recognizedText.blocks) {
+      allLines.addAll(block.lines);
+    }
+    allLines.sort((a, b) => a.boundingBox.top.compareTo(b.boundingBox.top));
+
+    final rawLinesList =
+        allLines.isNotEmpty
+            ? allLines.map((l) => l.text).toList()
+            : recognizedText.text.split('\n');
+
+    // 2. Clean lines, remove punctuation and known noise tokens (like IND, vehicle brands)
+    final cleanedLines = <String>[];
+    for (final line in rawLinesList) {
+      String l = line.toUpperCase().trim();
+      if (l.isEmpty) continue;
+      l = l.replaceAll(RegExp(r'[^A-Z0-9\s]'), ' ');
+
+      for (final noise in noiseWords) {
+        l = l.replaceAll(RegExp(r'\b' + noise + r'\b'), ' ');
+      }
+
+      // Handle glued "IND" e.g. "INDMH12AB1234" -> "MH12AB1234"
+      if (l.startsWith('IND') && l.length > 5) {
+        final sub = l.substring(3).trim();
+        if (validStates.any((st) => sub.startsWith(st))) {
+          l = sub;
+        }
+      }
+
+      l = l.replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (l.isNotEmpty) {
+        cleanedLines.add(l);
+      }
+    }
+
+    if (cleanedLines.isEmpty) return null;
+
+    // 3. Build candidate strings:
+    //    A. All lines joined with space & without space (multi-line bike plates)
+    //    B. Pairs and triplets of consecutive lines
+    //    C. Individual cleaned lines
+    final candidates = <String>[];
+    candidates.add(cleanedLines.join(' '));
+    candidates.add(cleanedLines.join(''));
+
+    for (int i = 0; i < cleanedLines.length - 1; i++) {
+      candidates.add('${cleanedLines[i]} ${cleanedLines[i + 1]}');
+      candidates.add('${cleanedLines[i]}${cleanedLines[i + 1]}');
+    }
+
+    for (int i = 0; i < cleanedLines.length - 2; i++) {
+      candidates.add(
+        '${cleanedLines[i]} ${cleanedLines[i + 1]} ${cleanedLines[i + 2]}',
+      );
+      candidates.add(
+        '${cleanedLines[i]}${cleanedLines[i + 1]}${cleanedLines[i + 2]}',
+      );
+    }
+
+    candidates.addAll(cleanedLines);
+
+    // --- Step A: Check Bharat (BH) series (e.g. 22BH1234AA) ---
+    final bhRegex = RegExp(
+      r'\b([0-9]{2})[ -]?(BH)[ -]?([0-9]{4})[ -]?([A-Z]{1,2})\b',
+      caseSensitive: false,
+    );
+    for (final c in candidates) {
+      final m = bhRegex.firstMatch(c);
+      if (m != null) {
+        return '${m.group(1)}BH${m.group(3)}${m.group(4)}'.toUpperCase();
+      }
+    }
+
+    // --- Step B: Strict Matching with Known State Codes ---
+    for (final state in validStates) {
+      final isDelhi = (state == 'DL');
+
+      for (final c in candidates) {
+        // Standard clean 3-4 digit registration number
+        final standardCleanRegex =
+            isDelhi
+                ? RegExp(
+                  r'\bDL[ -]?([0-9]{1,2}[A-Z]?)[ -]?([A-Z]{1,3})?[ -]?([0-9]{3,4})\b',
+                  caseSensitive: false,
+                )
+                : RegExp(
+                  r'\b' +
+                      state +
+                      r'[ -]?([0-9]{1,2})[ -]?([A-Z]{1,3})?[ -]?([0-9]{3,4})\b',
+                  caseSensitive: false,
+                );
+
+        final cleanMatch = standardCleanRegex.firstMatch(c);
+        if (cleanMatch != null) {
+          final rto = cleanMatch.group(1)!;
+          final series = cleanMatch.group(2) ?? '';
+          final num = cleanMatch.group(3)!;
+          return '$state$rto$series$num';
+        }
+
+        // Tolerance for OCR character substitutions
+        final standardOcrRegex =
+            isDelhi
+                ? RegExp(
+                  r'\bDL[ -]?([0-9OIZSBDGQ]{1,2}[A-Z]?)[ -]?([A-Z0-9]{1,3})?[ -]?([0-9OIZSBDGQ]{3,4})\b',
+                  caseSensitive: false,
+                )
+                : RegExp(
+                  r'\b' +
+                      state +
+                      r'[ -]?([0-9OIZSBDGQ]{1,2})[ -]?([A-Z0-9]{1,3})?[ -]?([0-9OIZSBDGQ]{3,4})\b',
+                  caseSensitive: false,
+                );
+
+        final ocrMatch = standardOcrRegex.firstMatch(c);
+        if (ocrMatch != null) {
+          final rtoRaw = ocrMatch.group(1)!;
+          final seriesRaw = ocrMatch.group(2);
+          final numRaw = ocrMatch.group(3)!;
+
+          final rto =
+              isDelhi ? correctToDelhiRto(rtoRaw) : correctToDigits(rtoRaw);
+          final series = seriesRaw != null ? correctToLetters(seriesRaw) : '';
+          final num = correctToDigits(numRaw);
+
+          if (rto.isNotEmpty && num.length >= 3) {
+            return '$state$rto$series$num';
+          }
+        }
+
+        // 1 to 2 digit VIP numbers
+        final vipCleanRegex =
+            isDelhi
+                ? RegExp(
+                  r'\bDL[ -]?([0-9]{1,2}[A-Z]?)[ -]?([A-Z]{1,3})[ -]?([0-9]{1,2})\b',
+                  caseSensitive: false,
+                )
+                : RegExp(
+                  r'\b' +
+                      state +
+                      r'[ -]?([0-9]{1,2})[ -]?([A-Z]{1,3})[ -]?([0-9]{1,2})\b',
+                  caseSensitive: false,
+                );
+
+        final vipMatch = vipCleanRegex.firstMatch(c);
+        if (vipMatch != null) {
+          final rto = vipMatch.group(1)!;
+          final series = vipMatch.group(2)!;
+          final num = vipMatch.group(3)!;
+          return '$state$rto$series$num';
+        }
+      }
+    }
+
+    // --- Step C: Generic 2-letter state code ---
+    final genericRegex = RegExp(
+      r'\b([A-Z]{2})[ -]?([0-9]{1,2}[A-Z]?)[ -]?([A-Z]{1,3})?[ -]?([0-9]{3,4})\b',
+      caseSensitive: false,
+    );
+    for (final c in candidates) {
+      final m = genericRegex.firstMatch(c);
+      if (m != null) {
+        final st = m.group(1)!.toUpperCase();
+        final rto = m.group(2)!;
+        final series = m.group(3) ?? '';
+        final num = m.group(4)!;
+        return '$st$rto$series$num';
+      }
+    }
+
+    // --- Step D: Compact alphanumeric check without spaces ---
+    for (final c in candidates) {
+      final compact = c.replaceAll(RegExp(r'\s+'), '');
+      final match = RegExp(
+        r'([A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{3,4})',
+      ).firstMatch(compact);
+      if (match != null) {
+        return match.group(1);
+      }
+    }
+
+    // --- Step E: Fallback to trailing 4 digits ---
+    final fourDigitRegex = RegExp(r'\b([0-9]{4})\b');
+    final fourMatch = fourDigitRegex.firstMatch(recognizedText.text);
+    if (fourMatch != null) {
+      return fourMatch.group(1);
+    }
+
+    return null;
+  }
+
   Future<void> _captureVehicleImage() async {
     try {
       final XFile? photo = await _imagePicker.pickImage(
@@ -650,14 +1176,81 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         imageQuality: 85,
       );
       if (photo != null) {
+        String? detectedVehicleNumber;
+        // Run OCR text recognition on the captured photo
+        try {
+          final inputImage = InputImage.fromFilePath(photo.path);
+          final textRecognizer = TextRecognizer(
+            script: TextRecognitionScript.latin,
+          );
+          final RecognizedText recognizedText = await textRecognizer
+              .processImage(inputImage);
+          await textRecognizer.close();
+
+          detectedVehicleNumber = _extractVehicleNumberFromRecognizedText(
+            recognizedText,
+          );
+          if (detectedVehicleNumber != null &&
+              detectedVehicleNumber.isNotEmpty) {
+            setState(() {
+              carController.text = detectedVehicleNumber!;
+              carController.selection = TextSelection.fromPosition(
+                TextPosition(offset: carController.text.length),
+              );
+            });
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Vehicle No: $detectedVehicleNumber entered',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: Colors.green.shade700,
+                  duration: const Duration(seconds: 3),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          }
+        } catch (ocrError) {
+          print('OCR error: $ocrError');
+        }
+
         try {
           final compressedFile = await _compressVehicleImage(File(photo.path));
           setState(() {
             _vehicleImages.add(compressedFile);
           });
-          if (mounted) {
+          if (mounted && detectedVehicleNumber == null) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Vehicle image added')),
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Photo added. Number plate not detected automatically - please enter manually.',
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.orange.shade800,
+                duration: const Duration(seconds: 4),
+                behavior: SnackBarBehavior.floating,
+              ),
             );
           }
         } catch (e) {
@@ -691,9 +1284,33 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
   }
 
   Future<List<Car>> fetchCars(String userId) async {
-    final response = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}get-vehicle?id=$userId'),
-    );
+    late http.Response response;
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    bool isOnline =
+        connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+    if (!isOnline) {
+      var cached = LocalDbService.getCachedApiResponse(
+        Uri.parse('${ApiConfig.baseUrl}get-vehicle?id=$userId').toString(),
+      );
+      if (cached != null) {
+        response = http.Response(jsonEncode(cached), 200);
+      } else {
+        response = http.Response('{}', 500);
+      }
+    } else {
+      response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}get-vehicle?id=$userId'),
+      );
+      if (response.statusCode == 200) {
+        try {
+          LocalDbService.cacheApiResponse(
+            Uri.parse('${ApiConfig.baseUrl}get-vehicle?id=$userId').toString(),
+            jsonDecode(response.body),
+          );
+        } catch (_) {}
+      }
+    }
 
     if (response.statusCode == 200) {
       Map<String, dynamic> jsonResponse = json.decode(response.body);
@@ -706,7 +1323,31 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
 
   Future<List<Vendor>> fetchVendors() async {
     try {
-      final response = await http.get(Uri.parse(apiUrl));
+      late http.Response response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(
+          Uri.parse(apiUrl).toString(),
+        );
+        if (cached != null) {
+          response = http.Response(jsonEncode(cached), 200);
+        } else {
+          response = http.Response('{}', 500);
+        }
+      } else {
+        response = await http.get(Uri.parse(apiUrl));
+        if (response.statusCode == 200) {
+          try {
+            LocalDbService.cacheApiResponse(
+              Uri.parse(apiUrl).toString(),
+              jsonDecode(response.body),
+            );
+          } catch (_) {}
+        }
+      }
       if (response.statusCode == 200) {
         Map<String, dynamic> data = json.decode(response.body);
         List<dynamic> vendorData = data['vendorData'];
@@ -749,12 +1390,6 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
   }
 
   void _registerParking() async {
-    // First check if we have slot data
-    if (_availableSlots == null) {
-      _showError('Unable to check parking availability. Please try again.');
-      return;
-    }
-
     // Determine vehicle type
     String vehicleType;
     switch (_selectedIndex) {
@@ -771,20 +1406,29 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         vehicleType = 'Unknown';
     }
 
-    // Check available slots
-    int available = 0;
-    if (vehicleType == 'Car') {
-      available = _availableSlots!['Cars'] ?? 0;
-    } else if (vehicleType == 'Bike') {
-      available = _availableSlots!['Bikes'] ?? 0;
-    } else {
-      available = _availableSlots!['Others'] ?? 0;
-    }
+    // Check available slots (skip when offline and slots not loaded)
+    var _connectivityForSlots = await (Connectivity().checkConnectivity());
+    bool _isOnlineForSlots =
+        _connectivityForSlots.isNotEmpty &&
+        _connectivityForSlots.first != ConnectivityResult.none;
+    if (_availableSlots != null) {
+      int available = 0;
+      if (vehicleType == 'Car') {
+        available = _availableSlots!['Cars'] ?? 0;
+      } else if (vehicleType == 'Bike') {
+        available = _availableSlots!['Bikes'] ?? 0;
+      } else {
+        available = _availableSlots!['Others'] ?? 0;
+      }
 
-    if (available <= 0) {
-      _showError(
-        'No space available for $vehicleType. Please try another vehicle type or check back later.',
-      );
+      if (available <= 0 && _isOnlineForSlots) {
+        _showError(
+          'No space available for $vehicleType. Please try another vehicle type or check back later.',
+        );
+        return;
+      }
+    } else if (_isOnlineForSlots) {
+      _showError('Unable to check parking availability. Please try again.');
       return;
     }
 
@@ -993,6 +1637,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     } finally {
       setState(() {
         _isLoading = false;
+        _activeLoadingButton = '';
       });
     }
   }
@@ -1000,6 +1645,71 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
   /// Sends booking request - uses JSON when no images, multipart when vehicle images are present.
   /// Uses machinecreatebooking for all booking flows. Vehicle images are compressed before add.
   Future<http.Response> _sendBookingRequest(Map<String, dynamic> data) async {
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    bool isOnline =
+        connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+
+    if (!isOnline) {
+      // Generate a temp booking ID that looks like the backend online ID (e.g. PMW300920261188)
+      final now = DateTime.now();
+      String msStr = now.millisecondsSinceEpoch.toString();
+      String shortMs =
+          msStr.length > 4 ? msStr.substring(msStr.length - 4) : msStr;
+      String tempId = 'PMW${DateFormat("ddMMyyyy").format(now)}$shortMs';
+
+      // Assign the generated ID into the payload so the backend permanently honors it upon sync
+      data['invoiceid'] = tempId;
+
+      await LocalDbService.addPendingAction({
+        'offline_id': tempId,
+        'type': 'CREATE_BOOKING',
+        'payload': data,
+      });
+
+      // Cache the booking in the dashboard's API cache so it shows in the booking list offline
+      final bookingCacheData = Map<String, dynamic>.from(data);
+      bookingCacheData['_id'] = tempId;
+      bookingCacheData['invoiceid'] = tempId;
+      bookingCacheData['isOffline'] = true;
+      if (_vehicleImages.isNotEmpty) {
+        bookingCacheData['vehicleImages'] =
+            _vehicleImages.map((f) => f.path).toList();
+      }
+
+      final String vehicleType = data['vehicleType'] ?? 'Car';
+      final String vendorId = data['vendorId'] ?? widget.vendorid;
+      final String status = (data['status'] ?? '').toString().toUpperCase();
+
+      // Add to the general booking list cache
+      final generalUrl =
+          '${ApiConfig.baseUrl}vendor/getbookingdata/$vendorId/$vehicleType';
+      await LocalDbService.addOfflineBookingToCache(
+        generalUrl,
+        bookingCacheData,
+      );
+
+      // Add to the appropriate filtered list (onparking or completed)
+      final String filterSuffix =
+          status == 'PARKED' ? 'onparking' : 'completed';
+      final filteredUrl =
+          '${ApiConfig.baseUrl}vendor/getbookingdata/$vendorId/$vehicleType/$filterSuffix';
+      await LocalDbService.addOfflineBookingToCache(
+        filteredUrl,
+        bookingCacheData,
+      );
+
+      return http.Response(
+        jsonEncode({
+          'message': 'Booking created successfully',
+          'bookingId': tempId,
+          'invoiceId': tempId,
+          'data': {'_id': tempId, ...data},
+        }),
+        200,
+      );
+    }
+
     final url = Uri.parse('${ApiConfig.baseUrl}vendor/machinecreatebooking');
     if (_vehicleImages.isEmpty) {
       return await http.post(
@@ -1042,12 +1752,6 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
 
   // Function to book and print ticket
   Future<void> _bookAndPrint() async {
-    // First check if we have slot data
-    if (_availableSlots == null) {
-      _showError('Unable to check parking availability. Please try again.');
-      return;
-    }
-
     // Determine vehicle type
     String vehicleType;
     switch (_selectedIndex) {
@@ -1064,20 +1768,29 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         vehicleType = 'Unknown';
     }
 
-    // Check available slots
-    int available = 0;
-    if (vehicleType == 'Car') {
-      available = _availableSlots!['Cars'] ?? 0;
-    } else if (vehicleType == 'Bike') {
-      available = _availableSlots!['Bikes'] ?? 0;
-    } else {
-      available = _availableSlots!['Others'] ?? 0;
-    }
+    // Check available slots (skip when offline and slots not loaded)
+    var _connectivityForSlots = await (Connectivity().checkConnectivity());
+    bool _isOnlineForSlots =
+        _connectivityForSlots.isNotEmpty &&
+        _connectivityForSlots.first != ConnectivityResult.none;
+    if (_availableSlots != null) {
+      int available = 0;
+      if (vehicleType == 'Car') {
+        available = _availableSlots!['Cars'] ?? 0;
+      } else if (vehicleType == 'Bike') {
+        available = _availableSlots!['Bikes'] ?? 0;
+      } else {
+        available = _availableSlots!['Others'] ?? 0;
+      }
 
-    if (available <= 0) {
-      _showError(
-        'No space available for $vehicleType. Please try another vehicle type or check back later.',
-      );
+      if (available <= 0 && _isOnlineForSlots) {
+        _showError(
+          'No space available for $vehicleType. Please try another vehicle type or check back later.',
+        );
+        return;
+      }
+    } else if (_isOnlineForSlots) {
+      _showError('Unable to check parking availability. Please try again.');
       return;
     }
 
@@ -1311,8 +2024,714 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     } finally {
       setState(() {
         _isLoading = false;
+        _activeLoadingButton = '';
       });
     }
+  }
+
+  // Function to book parking and show digital ticket & QR code on screen
+  Future<void> _bookAndShow() async {
+    // Determine vehicle type
+    String vehicleType;
+    switch (_selectedIndex) {
+      case 0:
+        vehicleType = 'Car';
+        break;
+      case 1:
+        vehicleType = 'Bike';
+        break;
+      case 2:
+        vehicleType = 'Others';
+        break;
+      default:
+        vehicleType = 'Unknown';
+    }
+
+    // Check available slots (skip when offline and slots not loaded)
+    var _connectivityForSlots = await (Connectivity().checkConnectivity());
+    bool _isOnlineForSlots =
+        _connectivityForSlots.isNotEmpty &&
+        _connectivityForSlots.first != ConnectivityResult.none;
+    if (_availableSlots != null) {
+      int available = 0;
+      if (vehicleType == 'Car') {
+        available = _availableSlots!['Cars'] ?? 0;
+      } else if (vehicleType == 'Bike') {
+        available = _availableSlots!['Bikes'] ?? 0;
+      } else {
+        available = _availableSlots!['Others'] ?? 0;
+      }
+
+      if (available <= 0 && _isOnlineForSlots) {
+        _showError(
+          'No space available for $vehicleType. Please try another vehicle type or check back later.',
+        );
+        return;
+      }
+    } else if (_isOnlineForSlots) {
+      _showError('Unable to check parking availability. Please try again.');
+      return;
+    }
+
+    // Validation for empty fields
+    if (carController.text.isEmpty) {
+      _showError('Please enter vehicle number');
+      return;
+    }
+
+    if (_selectedOption == 'Subscription' &&
+        subscriptionDateTimeController.text.isEmpty) {
+      _showError('Please select a parking date and time for the subscription');
+      return;
+    }
+
+    if (_selectedOption == 'Schedule' && dateeTimeController.text.isEmpty) {
+      _showError(
+        'Please select a parking date and time for the scheduled booking',
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _activeLoadingButton = 'bookAndShow';
+    });
+
+    String status =
+        (_selectedOption == 'Instant' || _selectedOption == 'Schedule')
+            ? 'PARKED'
+            : 'COMPLETED';
+
+    DateTime now = DateTime.now();
+    String approvedDate = '';
+    String approvedTime = '';
+    String parkingDate = '';
+    String parkingTime = '';
+    String amount = '';
+    String subscriptionEndDate = '';
+
+    if (_selectedOption == 'Subscription') {
+      amount = _selectedAmountForBooking(vehicleType);
+
+      try {
+        DateTime subscriptionDateTime = DateFormat(
+          "dd-MM-yyyy hh:mm a",
+        ).parse(subscriptionDateTimeController.text);
+        approvedDate = DateFormat("dd-MM-yyyy").format(subscriptionDateTime);
+        approvedTime = DateFormat("hh:mm a").format(subscriptionDateTime);
+        parkingDate = approvedDate;
+        parkingTime = approvedTime;
+        subscriptionEndDate = _computeSubscriptionEndDate(
+          subscriptionDateTimeController.text,
+        );
+      } catch (e) {
+        _showError('Invalid subscription date and time format');
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+    } else if (_selectedOption == 'Instant' || _selectedOption == 'Schedule') {
+      amount = _selectedAmountForBooking(vehicleType);
+
+      if (_selectedOption == 'Instant') {
+        approvedDate = DateFormat("dd-MM-yyyy").format(now);
+        approvedTime = DateFormat("hh:mm a").format(now);
+        parkingDate = approvedDate;
+        parkingTime = approvedTime;
+      } else if (_selectedOption == 'Schedule') {
+        try {
+          DateTime scheduleDateTime = DateFormat(
+            "dd-MM-yyyy hh:mm a",
+          ).parse(dateeTimeController.text);
+          parkingDate = DateFormat("dd-MM-yyyy").format(scheduleDateTime);
+          parkingTime = DateFormat("hh:mm a").format(scheduleDateTime);
+        } catch (e) {
+          _showError('Invalid schedule date and time format');
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+    }
+
+    double appliedValetAmount = 0.0;
+    if (_valetEnabled && _isValetSelected && _isValetChargeApplicable()) {
+      double valetAmount = _getValetChargeAmount();
+      if (valetAmount > 0) {
+        appliedValetAmount = valetAmount;
+      }
+    }
+
+    final String stsSnapshot = _stsForBookingRequest();
+    final String combinedVehicleNumber = _getCombinedVehicleNumber();
+    final String personName = nameController.text;
+    final String mobileNumber = mobileController.text;
+
+    final data = {
+      'carType': CartypeController.text,
+      'personName': personName,
+      'mobileNumber': mobileNumber,
+      'vehicleNumber': combinedVehicleNumber,
+      'vendorName': _vendor?.vendorName ?? '',
+      'sts': stsSnapshot,
+      'bookingDate': DateFormat("dd-MM-yyyy").format(now),
+      'vendorId': widget.vendorid,
+      'amount': amount,
+      'hour': "",
+      'status': status,
+      'vehicleType': vehicleType,
+      'parkingDate': parkingDate,
+      'parkingTime': parkingTime,
+      'bookingTime': DateFormat("hh:mm a").format(now),
+      'cancelledStatus': "",
+      'subsctiptiontype': _selectedSubscriptionType ?? '',
+      'approvedDate': approvedDate,
+      'approvedTime': approvedTime,
+      'parkedDate': approvedDate,
+      'subsctiptionenddate': subscriptionEndDate,
+      'parkedTime': approvedTime,
+      'tenditivecheckout': checkout.text,
+      'paymentType': _paymentType,
+      'paymentMode': _paymentMode,
+      'bookType': isHourly ? 'Hourly' : '24 Hours',
+      'valetToken': _valetTokenController.text,
+      'valetLocation': _valetLocationController.text,
+      'valetDriverId': _selectedValetDriverId ?? '',
+      'isValet': _valetEnabled && _isValetSelected && _isValetUIApplicable(),
+      'valetCharge':
+          (_valetEnabled && _isValetSelected && _isValetChargeApplicable())
+              ? _getValetChargeAmount().toString()
+              : "0",
+    };
+
+    try {
+      final response = await _sendBookingRequest(data);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is! Map) {
+          _showError('Invalid server response');
+          return;
+        }
+        final Map<String, dynamic> responseBody = Map<String, dynamic>.from(
+          decoded,
+        );
+        if (responseBody['message'] == 'Booking created successfully') {
+          final String bookingId = responseBody['bookingId']?.toString() ?? '';
+          final String invoiceId =
+              UniversalPrintHelper.extractInvoiceIdFromJson(responseBody);
+          final String vendorName = _vendor?.vendorName ?? '';
+          final String receiptAmount = _amountFromResponse(
+            responseBody,
+            amount,
+          );
+          final bool instantReceipt =
+              _selectedOption == 'Instant' &&
+              (vehicleType == 'Car' ||
+                  vehicleType == 'Bike' ||
+                  vehicleType == 'Others' ||
+                  vehicleType == 'other' ||
+                  vehicleType == 'Other') &&
+              _selectedPass == null &&
+              isHourly;
+
+          final upiUri = responseBody['upi']?['uri'];
+          final upiAmount = responseBody['upi']?['am']?.toString();
+          if (_paymentMode == 'Online' &&
+              upiUri is String &&
+              upiUri.trim().isNotEmpty) {
+            if (!mounted) return;
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (_) => UpiPaymentQrPage(
+                      title: 'UPI Payment',
+                      upiUri: upiUri.trim(),
+                      amount: upiAmount,
+                      vendorName: vendorName,
+                    ),
+              ),
+            );
+          }
+
+          if (!mounted) return;
+          final List<String> capturedPhotoPaths =
+              _vehicleImages.map((f) => f.path).toList();
+          await _showTicketDialog(
+            vendorName: vendorName,
+            bookingId: bookingId,
+            invoiceId: invoiceId.isNotEmpty ? invoiceId : null,
+            vehicleType: vehicleType,
+            vehicleNumber: combinedVehicleNumber,
+            parkingDate: parkingDate,
+            parkingTime: parkingTime,
+            amount: receiptAmount,
+            personName: personName,
+            mobileNumber: mobileNumber,
+            receiptSts: stsSnapshot,
+            appliedValetAmount: appliedValetAmount,
+            instantParkingReceipt: instantReceipt,
+            vehicleImages: capturedPhotoPaths,
+          );
+
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Parking successfully registered!')),
+          );
+
+          _resetFields();
+        } else {
+          _showError('${responseBody['message']}');
+        }
+      } else {
+        String errMsg = 'Failed to register parking. Please try again.';
+        try {
+          final errBody = jsonDecode(response.body);
+          errMsg = errBody['message'] ?? errBody['error'] ?? errMsg;
+        } catch (_) {
+          if (response.body.isNotEmpty) errMsg = response.body;
+        }
+        if (response.statusCode == 413) {
+          errMsg = 'Image too large. Please try with fewer or smaller images.';
+        }
+        _showError(errMsg);
+      }
+    } catch (e) {
+      print('Exception occurred: $e');
+      _showError('An error occurred: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _activeLoadingButton = '';
+        });
+      }
+    }
+  }
+
+  Widget _buildTicketInfoRow(
+    String label,
+    String value, {
+    Color? valueColor,
+    bool isBold = false,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: valueColor ?? Colors.black87,
+            ),
+            textAlign: TextAlign.right,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showTicketDialog({
+    required String vendorName,
+    required String bookingId,
+    String? invoiceId,
+    required String vehicleType,
+    required String vehicleNumber,
+    required String parkingDate,
+    required String parkingTime,
+    required String amount,
+    required String personName,
+    required String mobileNumber,
+    String? receiptSts,
+    double appliedValetAmount = 0.0,
+    bool instantParkingReceipt = false,
+    List<String> vehicleImages = const [],
+  }) async {
+    final String displayId =
+        (invoiceId != null && invoiceId.isNotEmpty) ? invoiceId : bookingId;
+    final String snap = (receiptSts ?? '').trim().toLowerCase();
+    final int? passHours =
+        snap.isNotEmpty ? _passHoursFromSts(snap) : _selectedPass;
+    final bool isPass = passHours != null;
+    final bool isSubscription =
+        snap == 'weekly' ||
+        snap == '15day' ||
+        snap == 'monthly' ||
+        _selectedOption == 'Subscription';
+
+    String planLabel = '';
+    if (isPass) {
+      planLabel = passHours == 24 ? 'Full Day Pass' : '$passHours Hr Pass';
+    } else if (isSubscription) {
+      if (snap == 'weekly') {
+        planLabel = 'Weekly Subscription';
+      } else if (snap == '15day') {
+        planLabel = '15 Days Subscription';
+      } else {
+        planLabel = 'Monthly Subscription';
+      }
+    } else if (!isHourly) {
+      planLabel = '24 Hours';
+    } else {
+      planLabel = 'Hourly Parking';
+    }
+
+    final double baseAmt =
+        double.tryParse(amount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+    final double totalWithValet =
+        baseAmt + (appliedValetAmount > 0 ? appliedValetAmount : 0.0);
+    final String cleanedTotalAmt =
+        _cleanAmountForReceipt(totalWithValet.toString());
+
+    IconData vehicleIcon;
+    if (vehicleType.toLowerCase().contains('bike')) {
+      vehicleIcon = Icons.two_wheeler;
+    } else if (vehicleType.toLowerCase().contains('car')) {
+      vehicleIcon = Icons.directions_car;
+    } else {
+      vehicleIcon = Icons.local_shipping;
+    }
+
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 24,
+          ),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.check_circle,
+                          color: Colors.green.shade600,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Booking Confirmed',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            if (vendorName.trim().isNotEmpty)
+                              Text(
+                                vendorName.trim(),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        color: Colors.grey.shade500,
+                        onPressed: () => Navigator.pop(dialogContext),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Ticket Details Card
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      children: [
+                        // Vehicle Number Banner
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                            horizontal: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: ColorUtils.primarycolor().withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: ColorUtils.primarycolor().withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                vehicleIcon,
+                                color: ColorUtils.primarycolor(),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  vehicleNumber.toUpperCase(),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2,
+                                    color: ColorUtils.primarycolor(),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (vehicleImages.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              height: 120,
+                              width: double.infinity,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Image.file(
+                                    File(vehicleImages.first),
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (_, __, ___) => const SizedBox.shrink(),
+                                  ),
+                                  if (vehicleImages.length > 1)
+                                    Positioned(
+                                      top: 6,
+                                      right: 6,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.7),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          '+${vehicleImages.length} photos',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+
+                        // Booking ID
+                        _buildTicketInfoRow('Token / ID', displayId),
+                        const Divider(height: 12),
+
+                        // Vehicle Type
+                        _buildTicketInfoRow('Vehicle Type', vehicleType),
+                        const Divider(height: 12),
+
+                        // Date & Time
+                        _buildTicketInfoRow(
+                          'Parked At',
+                          '$parkingDate, $parkingTime',
+                        ),
+                        const Divider(height: 12),
+
+                        // Plan
+                        _buildTicketInfoRow('Plan', planLabel),
+                        const Divider(height: 12),
+
+                        // Amount (total amount including valet if applicable)
+                        _buildTicketInfoRow(
+                          'Amount',
+                          (cleanedTotalAmt.isNotEmpty && cleanedTotalAmt != '0')
+                              ? '₹$cleanedTotalAmt'
+                              : 'Free',
+                          valueColor: Colors.green.shade700,
+                          isBold: true,
+                        ),
+
+                        if (personName.trim().isNotEmpty) ...[
+                          const Divider(height: 12),
+                          _buildTicketInfoRow('Customer', personName.trim()),
+                        ],
+
+                        if (mobileNumber.trim().isNotEmpty) ...[
+                          const Divider(height: 12),
+                          _buildTicketInfoRow('Mobile', mobileNumber.trim()),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // QR Code
+                  if (bookingId.isNotEmpty) ...[
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: SizedBox(
+                          width: 160,
+                          height: 160,
+                          child: PrettyQrView.data(
+                            data: bookingId,
+                            errorCorrectLevel: QrErrorCorrectLevel.M,
+                            decoration: PrettyQrDecoration(
+                              shape: PrettyQrSmoothSymbol(
+                                color: ColorUtils.primarycolor(),
+                              ),
+                              background: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Action Buttons: Print Ticket & Done
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Printing ticket...'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                            await _printTicket(
+                              vendorName: vendorName,
+                              bookingId: bookingId,
+                              invoiceId: invoiceId,
+                              vehicleType: vehicleType,
+                              vehicleNumber: vehicleNumber,
+                              parkingDate: parkingDate,
+                              parkingTime: parkingTime,
+                              amount: amount,
+                              personName: personName,
+                              mobileNumber: mobileNumber,
+                              includeDuration: false,
+                              receiptSts: receiptSts,
+                              instantParkingReceipt: instantParkingReceipt,
+                              valetChargeAmount:
+                                  appliedValetAmount > 0
+                                      ? appliedValetAmount
+                                      : null,
+                            );
+                          },
+                          icon: const Icon(Icons.print, size: 16),
+                          label: Text(
+                            'Print',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: ColorUtils.primarycolor(),
+                            side: BorderSide(color: ColorUtils.primarycolor()),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          icon: const Icon(Icons.check, size: 16),
+                          label: Text(
+                            'Done',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ColorUtils.primarycolor(),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   static const String _printerTroubleshootMsg =
@@ -2052,7 +3471,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         (receiptSts == null && _selectedOption == 'Subscription');
 
     double finalAmt = double.tryParse(amount.toString().trim()) ?? 0.0;
-    if (isPrintAndExit && valetChargeAmount != null && valetChargeAmount > 0) {
+    if (valetChargeAmount != null && valetChargeAmount > 0) {
       finalAmt += valetChargeAmount;
     }
     final cleanedAmt = _cleanAmountForReceipt(finalAmt.toString());
@@ -2249,9 +3668,26 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         fast: true,
       );
 
-      if (printerType == 'sunmi' ||
-          printerType == 'sumi' ||
-          printerType == 'pinelabs_builtin') {
+      if (printerType == 'pinelabs_builtin') {
+        await PineLabsPrintHelper.printTicket(
+          vendorName: vendorName,
+          bookingId: bookingId,
+          invoiceId: printInvoiceId,
+          vehicleType: vehicleType,
+          vehicleNumber: vehicleNumber,
+          parkingDate: parkingDate,
+          parkingTime: parkingTime,
+          amount: amount,
+          personName: personName,
+          mobileNumber: mobileNumber,
+          duration: '',
+          bookType: isHourly ? 'Hourly' : '24 Hours',
+          isEntryReceipt: true,
+        );
+        return;
+      }
+
+      if (printerType == 'sunmi' || printerType == 'sumi') {
         await _doPrint(
           vendorName: vendorName,
           bookingId: bookingId,
@@ -2350,7 +3786,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           "TransactionType": _pinelabsPaymentMethod == 'UPI' ? 5120 : 4001,
         },
         "Header": {
-          "ApplicationId": "78d73040662d412d9dfdc5b9ce532d19",
+          "ApplicationId": "94378c89faa6482eb98b4941ff5e6d2c",
           "MethodId": "1001",
           "UserId": "user1234",
           "VersionNo": "1.0",
@@ -2358,8 +3794,12 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
       };
       String transactionData = jsonEncode(payload);
 
-      // Ensure service is bound
-      await PlutusSmart.bindToService();
+      // Check PineLabs Device
+      bool isPineLabs = await PlutusSmart.isPineLabsDevice();
+      if (!isPineLabs) {
+        _showError('PineLabs payment app not found');
+        return;
+      }
 
       // Trigger transaction
       String result = await PlutusSmart.startTransaction(transactionData);
@@ -2432,20 +3872,29 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         vehicleType = 'Unknown';
     }
 
-    // Check available slots
-    int available = 0;
-    if (vehicleType == 'Car') {
-      available = _availableSlots!['Cars'] ?? 0;
-    } else if (vehicleType == 'Bike') {
-      available = _availableSlots!['Bikes'] ?? 0;
-    } else {
-      available = _availableSlots!['Others'] ?? 0;
-    }
+    // Check available slots (skip when offline and slots not loaded)
+    var _connectivityForSlots = await (Connectivity().checkConnectivity());
+    bool _isOnlineForSlots =
+        _connectivityForSlots.isNotEmpty &&
+        _connectivityForSlots.first != ConnectivityResult.none;
+    if (_availableSlots != null) {
+      int available = 0;
+      if (vehicleType == 'Car') {
+        available = _availableSlots!['Cars'] ?? 0;
+      } else if (vehicleType == 'Bike') {
+        available = _availableSlots!['Bikes'] ?? 0;
+      } else {
+        available = _availableSlots!['Others'] ?? 0;
+      }
 
-    if (available <= 0) {
-      _showError(
-        'No space available for $vehicleType. Please try another vehicle type or check back later.',
-      );
+      if (available <= 0 && _isOnlineForSlots) {
+        _showError(
+          'No space available for $vehicleType. Please try another vehicle type or check back later.',
+        );
+        return;
+      }
+    } else if (_isOnlineForSlots) {
+      _showError('Unable to check parking availability. Please try again.');
       return;
     }
 
@@ -2686,6 +4135,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     } finally {
       setState(() {
         _isLoading = false;
+        _activeLoadingButton = '';
       });
     }
   }
@@ -2715,7 +4165,8 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
-                builder: (context) => vendordashScreen(vendorid: widget.vendorid),
+                builder:
+                    (context) => vendordashScreen(vendorid: widget.vendorid),
               ),
               (Route<dynamic> route) => false,
             );
@@ -2741,7 +4192,9 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                       Navigator.pushAndRemoveUntil(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => vendordashScreen(vendorid: widget.vendorid),
+                          builder:
+                              (context) =>
+                                  vendordashScreen(vendorid: widget.vendorid),
                         ),
                         (Route<dynamic> route) => false,
                       );
@@ -2754,8 +4207,10 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                           context,
                           MaterialPageRoute(
                             builder:
-                                (context) =>
-                                    qrcodeallowpark(vendorid: widget.vendorid, isFromNewBooking: true),
+                                (context) => qrcodeallowpark(
+                                  vendorid: widget.vendorid,
+                                  isFromNewBooking: true,
+                                ),
                           ),
                         );
                       },
@@ -2886,7 +4341,137 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 10),
+                          // Captured vehicle picture preview between Top Row and Input Row
+                          if (_vehicleImages.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              height: 130,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _vehicleImages.length,
+                                itemBuilder: (context, index) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 10),
+                                    child: Stack(
+                                      children: [
+                                        GestureDetector(
+                                          onTap: () {
+                                            showDialog(
+                                              context: context,
+                                              builder:
+                                                  (_) => Dialog(
+                                                    backgroundColor:
+                                                        Colors.transparent,
+                                                    insetPadding:
+                                                        const EdgeInsets.all(
+                                                          16,
+                                                        ),
+                                                    child: Stack(
+                                                      alignment:
+                                                          Alignment.topRight,
+                                                      children: [
+                                                        ClipRRect(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                12,
+                                                              ),
+                                                          child: Image.file(
+                                                            _vehicleImages[index],
+                                                          ),
+                                                        ),
+                                                        Positioned(
+                                                          top: 8,
+                                                          right: 8,
+                                                          child: GestureDetector(
+                                                            onTap:
+                                                                () =>
+                                                                    Navigator.pop(
+                                                                      context,
+                                                                    ),
+                                                            child: Container(
+                                                              padding:
+                                                                  const EdgeInsets.all(
+                                                                    6,
+                                                                  ),
+                                                              decoration: const BoxDecoration(
+                                                                color:
+                                                                    Colors
+                                                                        .black54,
+                                                                shape:
+                                                                    BoxShape
+                                                                        .circle,
+                                                              ),
+                                                              child: const Icon(
+                                                                Icons.close,
+                                                                color:
+                                                                    Colors
+                                                                        .white,
+                                                                size: 20,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                            );
+                                          },
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color:
+                                                    ColorUtils.primarycolor(),
+                                                width: 1.5,
+                                              ),
+                                            ),
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(7),
+                                              child: Image.file(
+                                                _vehicleImages[index],
+                                                width:
+                                                    MediaQuery.of(
+                                                      context,
+                                                    ).size.width -
+                                                    30,
+                                                height: 130,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: 2,
+                                          right: 2,
+                                          child: GestureDetector(
+                                            onTap:
+                                                () =>
+                                                    _removeVehicleImage(index),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(3),
+                                              decoration: const BoxDecoration(
+                                                color: Colors.red,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.close,
+                                                size: 12,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ] else
+                            const SizedBox(height: 10),
                           // Input Fields Row
                           Row(
                             children: [
@@ -2920,10 +4505,12 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                                     autofocus:
                                         true, // Enable autofocus for new booking page
                                     borderRadius: BorderRadius.circular(8),
-                                    keyboardType: TextInputType.number,
+                                    keyboardType: TextInputType.text,
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 5),
+                              _buildCameraIconButton(),
                               if (_isValetSelected && _isValetUIApplicable())
                                 const SizedBox(width: 5),
                               if (_isValetSelected && _isValetUIApplicable())
@@ -3165,7 +4752,8 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                             ColorUtils.primarycolor(),
                             _registerParking,
                             isDisabled: !_bookEnabled,
-                            // isLoading: _isLoading && _activeLoadingButton == 'bookNow',
+                            isLoading:
+                                _isLoading && _activeLoadingButton == 'bookNow',
                           ),
                           const SizedBox(width: 8),
                           _buildActionButton(
@@ -3173,10 +4761,16 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                             Icons.print,
                             ColorUtils.primarycolor(),
                             _bookAndPrint,
-                            isDisabled: !(_bookEnabled && _printEnabled),
-                            // isLoading: _isLoading && _activeLoadingButton == 'bookAndPrint',
+                            isDisabled: !_bookEnabled,
+                            isLoading:
+                                _isLoading &&
+                                _activeLoadingButton == 'bookAndPrint',
                           ),
-                          const SizedBox(width: 8),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
                           _buildActionButton(
                             (_isPineLabsEnabled && _paymentMode == 'Online')
                                 ? "Pay Now"
@@ -3188,9 +4782,25 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                             (_isPineLabsEnabled && _paymentMode == 'Online')
                                 ? _payNowAndPrint
                                 : _printAndExit,
-                            isDisabled: !(_printEnabled && _exitEnabled),
-                            // isLoading: _isLoading && _activeLoadingButton == 'printAndExit',
+                            isDisabled: !_bookEnabled,
+                            isLoading:
+                                _isLoading &&
+                                (_activeLoadingButton == 'printAndExit' ||
+                                    _activeLoadingButton == 'payNow'),
                           ),
+                          if (_bookAndShowEnabled) ...[
+                            const SizedBox(width: 8),
+                            _buildActionButton(
+                              "Book and Show",
+                              Icons.qr_code_2,
+                              ColorUtils.primarycolor(),
+                              _bookAndShow,
+                              isDisabled: !_bookEnabled,
+                              isLoading:
+                                  _isLoading &&
+                                  _activeLoadingButton == 'bookAndShow',
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 15),
@@ -3986,6 +5596,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     TextInputType? keyboardType,
     bool autofocus = false,
     bool enabled = true,
+    TextCapitalization textCapitalization = TextCapitalization.characters,
   }) {
     return AnimatedBuilder(
       animation: focusNode,
@@ -4009,6 +5620,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         autofocus: autofocus,
         enabled: enabled,
         keyboardType: keyboardType,
+        textCapitalization: textCapitalization,
         textAlignVertical: TextAlignVertical.center,
         style: const TextStyle(fontSize: 13),
         decoration: InputDecoration(
@@ -4020,6 +5632,76 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           ),
           border: InputBorder.none,
           isDense: true,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCameraIconButton() {
+    final bool hasImages = _vehicleImages.isNotEmpty;
+    return _buildLabelAboveField(
+      label: 'Camera',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _captureVehicleImage,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            height: 40,
+            width: 42,
+            decoration: BoxDecoration(
+              color:
+                  hasImages
+                      ? ColorUtils.primarycolor().withOpacity(0.08)
+                      : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color:
+                    hasImages
+                        ? ColorUtils.primarycolor()
+                        : Colors.grey.shade300,
+                width: hasImages ? 1.5 : 1.0,
+              ),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  Icons.camera_alt,
+                  color: hasImages ? ColorUtils.primarycolor() : Colors.black87,
+                  size: 20,
+                ),
+                if (hasImages)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: ColorUtils.primarycolor(),
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${_vehicleImages.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            height: 1.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -4180,16 +5862,24 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                 ? const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
                 )
                 : Icon(icon, size: 16),
-        label: Text(label, style: const TextStyle(fontSize: 11)),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         style: ElevatedButton.styleFrom(
           backgroundColor:
               (isDisabled || isLoading) ? Colors.grey.shade300 : color,
           foregroundColor:
               (isDisabled || isLoading) ? Colors.grey.shade500 : Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: (isDisabled || isLoading) ? 0 : 2,
         ),

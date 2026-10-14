@@ -40,24 +40,46 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "bindToService" -> bindToService(result)
+                "isPineLabsDevice" -> checkPineLabsDevice(result)
                 "startTransaction" -> {
                     val transactionData = call.argument<String>("transactionData")
-                    if (transactionData != null && isServiceBound) {
+                    if (transactionData != null) {
                         startTransaction(transactionData, result)
                     } else {
-                        result.error("SERVICE_NOT_BOUND", "Service not bound or missing transaction data", null)
+                        result.error("INVALID_DATA", "Missing transaction data", null)
                     }
                 }
                 "startPrintJob" -> {
                     val printData = call.argument<String>("printData")
-                    if (printData != null && isServiceBound) {
+                    if (printData != null) {
                         startPrintJob(printData, result)
                     } else {
-                        result.error("SERVICE_NOT_BOUND", "Service not bound or missing print data", null)
+                        result.error("INVALID_DATA", "Missing print data", null)
                     }
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    private fun checkPineLabsDevice(result: Result) {
+        try {
+            val pm = packageManager
+            val intent = Intent("com.pinelabs.masterapp.HYBRID_REQUEST")
+            val resolveInfo = pm.resolveActivity(intent, 0)
+            if (resolveInfo != null) {
+                result.success(true)
+            } else {
+                // Fallback check by package name
+                try {
+                    pm.getPackageInfo(PLUTUS_SMART_PACKAGE, 0)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.success(false)
+                }
+            }
+        } catch (e: Exception) {
+            result.success(false)
         }
     }
 
@@ -83,7 +105,7 @@ class MainActivity : FlutterActivity() {
 
     private fun startTransaction(transactionData: String, result: Result) {
         try {
-            Log.d("MainActivity", "Service bound, starting transaction: $transactionData")
+            Log.d("MainActivity", "Starting transaction: $transactionData")
             pendingResult = result
 
             val intent = Intent("com.pinelabs.masterapp.HYBRID_REQUEST").apply {
@@ -100,7 +122,7 @@ class MainActivity : FlutterActivity() {
 
     private fun startPrintJob(printData: String, result: Result) {
         try {
-            Log.d("MainActivity", "Service bound, starting print job: $printData")
+            Log.d("MainActivity", "Starting print job: $printData")
             pendingResult = result
 
             val intent = Intent("com.pinelabs.masterapp.HYBRID_REQUEST").apply {

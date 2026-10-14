@@ -22,7 +22,9 @@ import 'package:mywheels/auth/vendor/vendorsearch.dart';
 import 'package:mywheels/auth/vendor/vendorsubscriptionapply.dart';
 import 'package:mywheels/config/authconfig.dart';
 import 'package:mywheels/config/colorcode.dart';
-import 'dart:convert'; // For json.decode
+import 'dart:convert';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:mywheels/services/local_db_service.dart'; // For json.decode
 import 'package:http/http.dart' as http;
 import 'package:mywheels/pageloader.dart';
 import 'package:mywheels/utils/sts_utils.dart';
@@ -34,6 +36,8 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:tab_container/tab_container.dart';
 import 'package:qr/qr.dart';
 import 'package:image/image.dart' as img;
+import 'package:mywheels/services/pinelabs_print_helper.dart';
+import 'package:mywheels/utils/vehicle_image_widget.dart';
 
 import '../../main.dart';
 import '../customer/parking/bookparking.dart';
@@ -77,6 +81,7 @@ class _HomeScreenState extends State<vendordashScreen>
   Vendor? _vendor;
   late List<Widget> _pages;
   late TabController _tabController;
+  Key _tabKey = UniqueKey();
 
   void _onTabChange(int index) {
     _navigateToPage(index);
@@ -114,11 +119,29 @@ class _HomeScreenState extends State<vendordashScreen>
 
   Future<void> _fetchVendorData() async {
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}',
-        ),
-      );
+      final String url =
+          '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}';
+      late http.Response response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(url);
+        if (cached != null) {
+          response = http.Response(jsonEncode(cached), 200);
+        } else {
+          response = http.Response('{}', 500);
+        }
+      } else {
+        response = await http.get(Uri.parse(url));
+        if (response.statusCode == 200) {
+          try {
+            LocalDbService.cacheApiResponse(url, jsonDecode(response.body));
+          } catch (_) {}
+        }
+      }
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
@@ -215,10 +238,36 @@ class _HomeScreenState extends State<vendordashScreen>
       final uri = Uri.parse(
         '${ApiConfig.baseUrl}vendor/fetch-slot-vendor-data/$vendorId',
       );
-      final response = await http.get(uri);
+      http.Response? response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      Map<String, dynamic> data = {};
+      bool proceed = false;
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(uri.toString());
+        if (cached != null) {
+          data = cached;
+          proceed = true;
+        } else {
+          throw Exception('No internet and no cache');
+        }
+      } else {
+        response = await http.get(uri);
+        if (response.statusCode == 200) {
+          data = jsonDecode(response.body);
+          LocalDbService.cacheApiResponse(uri.toString(), data);
+          proceed = true;
+        } else {
+          throw Exception(
+            'Failed to load data, status code: ${response?.statusCode}',
+          );
+        }
+      }
+
+      if (proceed) {
         if (data.isNotEmpty) {
           final List<Category> categories = [];
           data.forEach((key, value) {
@@ -232,7 +281,7 @@ class _HomeScreenState extends State<vendordashScreen>
         }
       } else {
         throw Exception(
-          'Failed to load categories, status code: ${response.statusCode}',
+          'Failed to load categories, status code: ${response?.statusCode}',
         );
       }
     } catch (e) {
@@ -243,10 +292,36 @@ class _HomeScreenState extends State<vendordashScreen>
   Future<Map<String, dynamic>> fetchbookedslot(String vendorId) async {
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}vendor/bookedslots/$vendorId');
-      final response = await http.get(uri);
+      http.Response? response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      Map<String, dynamic> data = {};
+      bool proceed = false;
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(uri.toString());
+        if (cached != null) {
+          data = cached;
+          proceed = true;
+        } else {
+          throw Exception('No internet and no cache');
+        }
+      } else {
+        response = await http.get(uri);
+        if (response.statusCode == 200) {
+          data = jsonDecode(response.body);
+          LocalDbService.cacheApiResponse(uri.toString(), data);
+          proceed = true;
+        } else {
+          throw Exception(
+            'Failed to load data, status code: ${response?.statusCode}',
+          );
+        }
+      }
+
+      if (proceed) {
         if (data.isNotEmpty) {
           final List<Category> categories = [];
           data.forEach((key, value) {
@@ -260,7 +335,7 @@ class _HomeScreenState extends State<vendordashScreen>
         }
       } else {
         throw Exception(
-          'Failed to load categories, status code: ${response.statusCode}',
+          'Failed to load categories, status code: ${response?.statusCode}',
         );
       }
     } catch (e) {
@@ -273,10 +348,36 @@ class _HomeScreenState extends State<vendordashScreen>
       final uri = Uri.parse(
         '${ApiConfig.baseUrl}vendor/availableslots/$vendorId',
       );
-      final response = await http.get(uri);
+      http.Response? response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      Map<String, dynamic> data = {};
+      bool proceed = false;
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(uri.toString());
+        if (cached != null) {
+          data = cached;
+          proceed = true;
+        } else {
+          throw Exception('No internet and no cache');
+        }
+      } else {
+        response = await http.get(uri);
+        if (response.statusCode == 200) {
+          data = jsonDecode(response.body);
+          LocalDbService.cacheApiResponse(uri.toString(), data);
+          proceed = true;
+        } else {
+          throw Exception(
+            'Failed to load data, status code: ${response?.statusCode}',
+          );
+        }
+      }
+
+      if (proceed) {
         if (data.isNotEmpty) {
           final List<Category> categories = [];
           data.forEach((key, value) {
@@ -290,7 +391,7 @@ class _HomeScreenState extends State<vendordashScreen>
         }
       } else {
         throw Exception(
-          'Failed to load categories, status code: ${response.statusCode}',
+          'Failed to load categories, status code: ${response?.statusCode}',
         );
       }
     } catch (e) {
@@ -303,10 +404,36 @@ class _HomeScreenState extends State<vendordashScreen>
       final uri = Uri.parse(
         '${ApiConfig.baseUrl}vendor/fetch-slot-vendor-data/$vendorId',
       );
-      final response = await http.get(uri);
+      http.Response? response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      Map<String, dynamic> data = {};
+      bool proceed = false;
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(uri.toString());
+        if (cached != null) {
+          data = cached;
+          proceed = true;
+        } else {
+          throw Exception('No internet and no cache');
+        }
+      } else {
+        response = await http.get(uri);
+        if (response.statusCode == 200) {
+          data = jsonDecode(response.body);
+          LocalDbService.cacheApiResponse(uri.toString(), data);
+          proceed = true;
+        } else {
+          throw Exception(
+            'Failed to load data, status code: ${response?.statusCode}',
+          );
+        }
+      }
+
+      if (proceed) {
         if (data.isNotEmpty) {
           final List<Category> categories = [];
           data.forEach((key, value) {
@@ -320,7 +447,7 @@ class _HomeScreenState extends State<vendordashScreen>
         }
       } else {
         throw Exception(
-          'Failed to load categories, status code: ${response.statusCode}',
+          'Failed to load categories, status code: ${response?.statusCode}',
         );
       }
     } catch (e) {
@@ -331,10 +458,36 @@ class _HomeScreenState extends State<vendordashScreen>
   Future<Map<String, dynamic>> fetchbikebookedslot(String vendorId) async {
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}vendor/bookedslots/$vendorId');
-      final response = await http.get(uri);
+      http.Response? response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      Map<String, dynamic> data = {};
+      bool proceed = false;
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(uri.toString());
+        if (cached != null) {
+          data = cached;
+          proceed = true;
+        } else {
+          throw Exception('No internet and no cache');
+        }
+      } else {
+        response = await http.get(uri);
+        if (response.statusCode == 200) {
+          data = jsonDecode(response.body);
+          LocalDbService.cacheApiResponse(uri.toString(), data);
+          proceed = true;
+        } else {
+          throw Exception(
+            'Failed to load data, status code: ${response?.statusCode}',
+          );
+        }
+      }
+
+      if (proceed) {
         if (data.isNotEmpty) {
           final List<Category> categories = [];
           data.forEach((key, value) {
@@ -348,7 +501,7 @@ class _HomeScreenState extends State<vendordashScreen>
         }
       } else {
         throw Exception(
-          'Failed to load categories, status code: ${response.statusCode}',
+          'Failed to load categories, status code: ${response?.statusCode}',
         );
       }
     } catch (e) {
@@ -361,10 +514,36 @@ class _HomeScreenState extends State<vendordashScreen>
       final uri = Uri.parse(
         '${ApiConfig.baseUrl}vendor/availableslots/$vendorId',
       );
-      final response = await http.get(uri);
+      http.Response? response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      Map<String, dynamic> data = {};
+      bool proceed = false;
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(uri.toString());
+        if (cached != null) {
+          data = cached;
+          proceed = true;
+        } else {
+          throw Exception('No internet and no cache');
+        }
+      } else {
+        response = await http.get(uri);
+        if (response.statusCode == 200) {
+          data = jsonDecode(response.body);
+          LocalDbService.cacheApiResponse(uri.toString(), data);
+          proceed = true;
+        } else {
+          throw Exception(
+            'Failed to load data, status code: ${response?.statusCode}',
+          );
+        }
+      }
+
+      if (proceed) {
         if (data.isNotEmpty) {
           final List<Category> categories = [];
           data.forEach((key, value) {
@@ -378,7 +557,7 @@ class _HomeScreenState extends State<vendordashScreen>
         }
       } else {
         throw Exception(
-          'Failed to load categories, status code: ${response.statusCode}',
+          'Failed to load categories, status code: ${response?.statusCode}',
         );
       }
     } catch (e) {
@@ -391,10 +570,36 @@ class _HomeScreenState extends State<vendordashScreen>
       final uri = Uri.parse(
         '${ApiConfig.baseUrl}vendor/fetch-slot-vendor-data/$vendorId',
       );
-      final response = await http.get(uri);
+      http.Response? response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      Map<String, dynamic> data = {};
+      bool proceed = false;
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(uri.toString());
+        if (cached != null) {
+          data = cached;
+          proceed = true;
+        } else {
+          throw Exception('No internet and no cache');
+        }
+      } else {
+        response = await http.get(uri);
+        if (response.statusCode == 200) {
+          data = jsonDecode(response.body);
+          LocalDbService.cacheApiResponse(uri.toString(), data);
+          proceed = true;
+        } else {
+          throw Exception(
+            'Failed to load data, status code: ${response?.statusCode}',
+          );
+        }
+      }
+
+      if (proceed) {
         if (data.isNotEmpty) {
           final List<Category> categories = [];
           data.forEach((key, value) {
@@ -411,7 +616,7 @@ class _HomeScreenState extends State<vendordashScreen>
         }
       } else {
         throw Exception(
-          'Failed to load categories, status code: ${response.statusCode}',
+          'Failed to load categories, status code: ${response?.statusCode}',
         );
       }
     } catch (e) {
@@ -422,10 +627,36 @@ class _HomeScreenState extends State<vendordashScreen>
   Future<Map<String, dynamic>> fetchothersbookedslot(String vendorId) async {
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}vendor/bookedslots/$vendorId');
-      final response = await http.get(uri);
+      http.Response? response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      Map<String, dynamic> data = {};
+      bool proceed = false;
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(uri.toString());
+        if (cached != null) {
+          data = cached;
+          proceed = true;
+        } else {
+          throw Exception('No internet and no cache');
+        }
+      } else {
+        response = await http.get(uri);
+        if (response.statusCode == 200) {
+          data = jsonDecode(response.body);
+          LocalDbService.cacheApiResponse(uri.toString(), data);
+          proceed = true;
+        } else {
+          throw Exception(
+            'Failed to load data, status code: ${response?.statusCode}',
+          );
+        }
+      }
+
+      if (proceed) {
         if (data.isNotEmpty) {
           final List<Category> categories = [];
           data.forEach((key, value) {
@@ -442,7 +673,7 @@ class _HomeScreenState extends State<vendordashScreen>
         }
       } else {
         throw Exception(
-          'Failed to load categories, status code: ${response.statusCode}',
+          'Failed to load categories, status code: ${response?.statusCode}',
         );
       }
     } catch (e) {
@@ -457,10 +688,36 @@ class _HomeScreenState extends State<vendordashScreen>
       final uri = Uri.parse(
         '${ApiConfig.baseUrl}vendor/availableslots/$vendorId',
       );
-      final response = await http.get(uri);
+      http.Response? response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+      Map<String, dynamic> data = {};
+      bool proceed = false;
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(uri.toString());
+        if (cached != null) {
+          data = cached;
+          proceed = true;
+        } else {
+          throw Exception('No internet and no cache');
+        }
+      } else {
+        response = await http.get(uri);
+        if (response.statusCode == 200) {
+          data = jsonDecode(response.body);
+          LocalDbService.cacheApiResponse(uri.toString(), data);
+          proceed = true;
+        } else {
+          throw Exception(
+            'Failed to load data, status code: ${response?.statusCode}',
+          );
+        }
+      }
+
+      if (proceed) {
         if (data.isNotEmpty) {
           final List<Category> categories = [];
           data.forEach((key, value) {
@@ -477,7 +734,7 @@ class _HomeScreenState extends State<vendordashScreen>
         }
       } else {
         throw Exception(
-          'Failed to load categories, status code: ${response.statusCode}',
+          'Failed to load categories, status code: ${response?.statusCode}',
         );
       }
     } catch (e) {
@@ -486,17 +743,36 @@ class _HomeScreenState extends State<vendordashScreen>
   }
 
   Future<String> fetchSubscriptionStatus(String vendorId) async {
-    // Make HTTP request and get the subscription status
-    final response = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}vendor/fetchsubscription/$vendorId'),
-    );
-
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> data = json.decode(response.body);
-      final vendor = data['vendor'];
-      return vendor['subscription']; // Return 'true' or 'false'
-    } else {
-      return 'false'; // Default to false if there's an error
+    final urlStr = '${ApiConfig.baseUrl}vendor/fetchsubscription/$vendorId';
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      final isOffline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first == ConnectivityResult.none;
+      if (isOffline) {
+        final cached = LocalDbService.getCachedApiResponse(urlStr);
+        if (cached != null) {
+          final vendor = cached['vendor'];
+          return vendor != null ? vendor['subscription'].toString() : 'false';
+        }
+        return 'true';
+      }
+      final response = await http.get(Uri.parse(urlStr));
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        LocalDbService.cacheApiResponse(urlStr, data);
+        final vendor = data['vendor'];
+        return vendor['subscription']?.toString() ?? 'false';
+      } else {
+        return 'false';
+      }
+    } catch (e) {
+      final cached = LocalDbService.getCachedApiResponse(urlStr);
+      if (cached != null) {
+        final vendor = cached['vendor'];
+        return vendor != null ? vendor['subscription'].toString() : 'false';
+      }
+      return 'true';
     }
   }
 
@@ -505,11 +781,29 @@ class _HomeScreenState extends State<vendordashScreen>
       _isLoading = true;
     });
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}',
-        ),
-      );
+      final String url =
+          '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}';
+      late http.Response response;
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      bool isOnline =
+          connectivityResult.isNotEmpty &&
+          connectivityResult.first != ConnectivityResult.none;
+
+      if (!isOnline) {
+        var cached = LocalDbService.getCachedApiResponse(url);
+        if (cached != null) {
+          response = http.Response(jsonEncode(cached), 200);
+        } else {
+          response = http.Response('{}', 500);
+        }
+      } else {
+        response = await http.get(Uri.parse(url));
+        if (response.statusCode == 200) {
+          try {
+            LocalDbService.cacheApiResponse(url, jsonDecode(response.body));
+          } catch (_) {}
+        }
+      }
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
@@ -799,7 +1093,19 @@ class _HomeScreenState extends State<vendordashScreen>
                               (context) =>
                                   vSearchScreen(vendorid: widget.vendorid),
                         ),
-                      );
+                      ).then((_) {
+                        GlobalVendorDashCache.carsOnParking = null;
+                        GlobalVendorDashCache.carsCompleted = null;
+                        GlobalVendorDashCache.bikesOnParking = null;
+                        GlobalVendorDashCache.bikesCompleted = null;
+                        GlobalVendorDashCache.othersOnParking = null;
+                        GlobalVendorDashCache.othersCompleted = null;
+                        if (mounted) {
+                          setState(() {
+                            _tabKey = UniqueKey();
+                          });
+                        }
+                      });
                     },
                     child: TextFormField(
                       readOnly: true,
@@ -811,7 +1117,19 @@ class _HomeScreenState extends State<vendordashScreen>
                                 (context) =>
                                     vSearchScreen(vendorid: widget.vendorid),
                           ),
-                        );
+                        ).then((_) {
+                          GlobalVendorDashCache.carsOnParking = null;
+                          GlobalVendorDashCache.carsCompleted = null;
+                          GlobalVendorDashCache.bikesOnParking = null;
+                          GlobalVendorDashCache.bikesCompleted = null;
+                          GlobalVendorDashCache.othersOnParking = null;
+                          GlobalVendorDashCache.othersCompleted = null;
+                          if (mounted) {
+                            setState(() {
+                              _tabKey = UniqueKey();
+                            });
+                          }
+                        });
                       },
                       decoration: InputDecoration(
                         filled: true,
@@ -847,7 +1165,19 @@ class _HomeScreenState extends State<vendordashScreen>
                                       vendorid: widget.vendorid,
                                     ),
                               ),
-                            );
+                            ).then((_) {
+                              GlobalVendorDashCache.carsOnParking = null;
+                              GlobalVendorDashCache.carsCompleted = null;
+                              GlobalVendorDashCache.bikesOnParking = null;
+                              GlobalVendorDashCache.bikesCompleted = null;
+                              GlobalVendorDashCache.othersOnParking = null;
+                              GlobalVendorDashCache.othersCompleted = null;
+                              if (mounted) {
+                                setState(() {
+                                  _tabKey = UniqueKey();
+                                });
+                              }
+                            });
                           },
                           child: Icon(
                             Icons.search,
@@ -1130,6 +1460,7 @@ class _HomeScreenState extends State<vendordashScreen>
                       child: Container(
                         color: const Color(0xFFF1F2F3),
                         child: TabBarView(
+                          key: _tabKey,
                           controller: _tabController,
                           children: [
                             CarsTab(
@@ -1533,7 +1864,9 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
     });
 
     _payableTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      updatePayableTimes();
+      if (mounted) {
+        updatePayableTimes();
+      }
     });
 
     // Try to load from cache first for instant display
@@ -1549,7 +1882,8 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
           if (mounted) {
             setState(() {
               bookingDataNotifier.value = data;
-              isLoading = false; // Set loading flag to false after initial data load
+              isLoading =
+                  false; // Set loading flag to false after initial data load
             });
             updatePayableTimes();
           }
@@ -1667,13 +2001,34 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
   }
 
   Future<List<Bookingdata>> fetchBookingData() async {
-    final url = Uri.parse(
-      '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Car',
-    );
+    final urlStr =
+        '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Car';
+    final url = Uri.parse(urlStr);
+
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    bool isOnline =
+        connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+
+    if (!isOnline) {
+      final cached = LocalDbService.getCachedApiResponse(urlStr);
+      if (cached != null && cached['bookings'] is List) {
+        final List<dynamic> data = cached['bookings'];
+        if (data.isEmpty) throw 'No bookings available';
+        return data
+            .map(
+              (item) => Bookingdata.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList();
+      }
+      throw 'No bookings available (offline)';
+    }
+
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonResponse = json.decode(response.body);
+      LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
       return data.map((item) => Bookingdata.fromJson(item)).toList();
@@ -1685,12 +2040,33 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
   }
 
   Future<List<Bookingdata>> fetchOnParkingData() async {
-    final url = Uri.parse(
-      '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Car/onparking',
-    );
+    final urlStr =
+        '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Car/onparking';
+    final url = Uri.parse(urlStr);
+
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    bool isOnline =
+        connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+
+    if (!isOnline) {
+      final cached = LocalDbService.getCachedApiResponse(urlStr);
+      if (cached != null && cached['bookings'] is List) {
+        final List<dynamic> data = cached['bookings'];
+        if (data.isEmpty) throw 'No bookings available';
+        return data
+            .map(
+              (item) => Bookingdata.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList();
+      }
+      throw 'No bookings available (offline)';
+    }
+
     final response = await http.get(url);
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonResponse = json.decode(response.body);
+      LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
       return data.map((item) => Bookingdata.fromJson(item)).toList();
@@ -1702,12 +2078,33 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
   }
 
   Future<List<Bookingdata>> fetchCompletedData() async {
-    final url = Uri.parse(
-      '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Car/completed',
-    );
+    final urlStr =
+        '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Car/completed';
+    final url = Uri.parse(urlStr);
+
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    bool isOnline =
+        connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+
+    if (!isOnline) {
+      final cached = LocalDbService.getCachedApiResponse(urlStr);
+      if (cached != null && cached['bookings'] is List) {
+        final List<dynamic> data = cached['bookings'];
+        if (data.isEmpty) throw 'No bookings available';
+        return data
+            .map(
+              (item) => Bookingdata.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList();
+      }
+      throw 'No bookings available (offline)';
+    }
+
     final response = await http.get(url);
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonResponse = json.decode(response.body);
+      LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
       return data.map((item) => Bookingdata.fromJson(item)).toList();
@@ -1869,6 +2266,9 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
                                 (v) => v.id == vehicle.id,
                               );
                               bookingDataNotifier.value = currentData;
+                              setState(
+                                () {},
+                              ); // Rebuild to refresh the Completed tab
                             },
                           );
                         },
@@ -2087,17 +2487,19 @@ class _BikesTabState extends State<BikesTab>
       updatePayableTimes();
     }
 
-    fetchOnParkingData().then((data) {
-      if (mounted) {
-        setState(() {
-          bookingDataNotifier.value = data;
+    fetchOnParkingData()
+        .then((data) {
+          if (mounted) {
+            setState(() {
+              bookingDataNotifier.value = data;
+            });
+            updatePayableTimes(); // Call update once data is fetched
+          }
+          GlobalVendorDashCache.bikesOnParking = data;
+        })
+        .catchError((error) {
+          // Do nothing on error for bikes tab
         });
-        updatePayableTimes(); // Call update once data is fetched
-      }
-      GlobalVendorDashCache.bikesOnParking = data;
-    }).catchError((error) {
-      // Do nothing on error for bikes tab
-    });
     fetchInitialData();
   }
 
@@ -2182,13 +2584,34 @@ class _BikesTabState extends State<BikesTab>
   }
 
   Future<List<Bookingdata>> fetchBookingData() async {
-    final url = Uri.parse(
-      '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Bike',
-    );
+    final urlStr =
+        '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Bike';
+    final url = Uri.parse(urlStr);
+
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    bool isOnline =
+        connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+
+    if (!isOnline) {
+      final cached = LocalDbService.getCachedApiResponse(urlStr);
+      if (cached != null && cached['bookings'] is List) {
+        final List<dynamic> data = cached['bookings'];
+        if (data.isEmpty) throw 'No bookings available';
+        return data
+            .map(
+              (item) => Bookingdata.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList();
+      }
+      throw 'No bookings available (offline)';
+    }
+
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonResponse = json.decode(response.body);
+      LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
       return data.map((item) => Bookingdata.fromJson(item)).toList();
@@ -2200,12 +2623,33 @@ class _BikesTabState extends State<BikesTab>
   }
 
   Future<List<Bookingdata>> fetchOnParkingData() async {
-    final url = Uri.parse(
-      '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Bike/onparking',
-    );
+    final urlStr =
+        '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Bike/onparking';
+    final url = Uri.parse(urlStr);
+
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    bool isOnline =
+        connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+
+    if (!isOnline) {
+      final cached = LocalDbService.getCachedApiResponse(urlStr);
+      if (cached != null && cached['bookings'] is List) {
+        final List<dynamic> data = cached['bookings'];
+        if (data.isEmpty) throw 'No bookings available';
+        return data
+            .map(
+              (item) => Bookingdata.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList();
+      }
+      throw 'No bookings available (offline)';
+    }
+
     final response = await http.get(url);
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonResponse = json.decode(response.body);
+      LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
       return data.map((item) => Bookingdata.fromJson(item)).toList();
@@ -2217,12 +2661,33 @@ class _BikesTabState extends State<BikesTab>
   }
 
   Future<List<Bookingdata>> fetchCompletedData() async {
-    final url = Uri.parse(
-      '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Bike/completed',
-    );
+    final urlStr =
+        '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Bike/completed';
+    final url = Uri.parse(urlStr);
+
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    bool isOnline =
+        connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+
+    if (!isOnline) {
+      final cached = LocalDbService.getCachedApiResponse(urlStr);
+      if (cached != null && cached['bookings'] is List) {
+        final List<dynamic> data = cached['bookings'];
+        if (data.isEmpty) throw 'No bookings available';
+        return data
+            .map(
+              (item) => Bookingdata.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList();
+      }
+      throw 'No bookings available (offline)';
+    }
+
     final response = await http.get(url);
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonResponse = json.decode(response.body);
+      LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
       return data.map((item) => Bookingdata.fromJson(item)).toList();
@@ -2384,6 +2849,9 @@ class _BikesTabState extends State<BikesTab>
                                 (v) => v.id == vehicle.id,
                               );
                               bookingDataNotifier.value = currentData;
+                              setState(
+                                () {},
+                              ); // Rebuild to refresh the Completed tab
                             },
                           );
                         },
@@ -2632,22 +3100,24 @@ class _OthersTabState extends State<OthersTab>
       updatePayableTimes();
     }
 
-    fetchOnParkingData().then((data) {
-      if (mounted) {
-        setState(() {
-          bookingDataNotifier.value = data;
-          isLoading = false;
+    fetchOnParkingData()
+        .then((data) {
+          if (mounted) {
+            setState(() {
+              bookingDataNotifier.value = data;
+              isLoading = false;
+            });
+            updatePayableTimes(); // Call update once data is fetched
+          }
+          GlobalVendorDashCache.othersOnParking = data;
+        })
+        .catchError((error) {
+          if (mounted) {
+            setState(() {
+              isLoading = false;
+            });
+          }
         });
-        updatePayableTimes(); // Call update once data is fetched
-      }
-      GlobalVendorDashCache.othersOnParking = data;
-    }).catchError((error) {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
-    });
     fetchInitialData();
   }
 
@@ -2734,54 +3204,117 @@ class _OthersTabState extends State<OthersTab>
   Future<List<Bookingdata>> fetchBookingData() async {
     setState(() => isLoading = true);
 
-    final url = Uri.parse(
-      '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Others',
-    );
+    final urlStr =
+        '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Others';
+    final url = Uri.parse(urlStr);
+
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    bool isOnline =
+        connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+
+    if (!isOnline) {
+      final cached = LocalDbService.getCachedApiResponse(urlStr);
+      if (cached != null && cached['bookings'] is List) {
+        final List<dynamic> data = cached['bookings'];
+        if (data.isEmpty) throw 'No bookings available';
+        return data
+            .map(
+              (item) => Bookingdata.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList();
+      }
+      throw 'No bookings available (offline)';
+    }
+
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonResponse = json.decode(response.body);
+      LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
       return data.map((item) => Bookingdata.fromJson(item)).toList();
     } else if (response.statusCode == 400) {
       throw 'No booking found';
     } else {
-      throw 'Error fetching data: ${response.statusCode}';
+      throw 'Error fetching data: ${response?.statusCode}';
     }
   }
 
   Future<List<Bookingdata>> fetchOnParkingData() async {
-    final url = Uri.parse(
-      '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Others/onparking',
-    );
+    final urlStr =
+        '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Others/onparking';
+    final url = Uri.parse(urlStr);
+
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    bool isOnline =
+        connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+
+    if (!isOnline) {
+      final cached = LocalDbService.getCachedApiResponse(urlStr);
+      if (cached != null && cached['bookings'] is List) {
+        final List<dynamic> data = cached['bookings'];
+        if (data.isEmpty) throw 'No bookings available';
+        return data
+            .map(
+              (item) => Bookingdata.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList();
+      }
+      throw 'No bookings available (offline)';
+    }
+
     final response = await http.get(url);
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonResponse = json.decode(response.body);
+      LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
       return data.map((item) => Bookingdata.fromJson(item)).toList();
     } else if (response.statusCode == 404 || response.statusCode == 400) {
       throw 'No booking found';
     } else {
-      throw 'Error fetching data: ${response.statusCode}';
+      throw 'Error fetching data: ${response?.statusCode}';
     }
   }
 
   Future<List<Bookingdata>> fetchCompletedData() async {
-    final url = Uri.parse(
-      '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Others/completed',
-    );
+    final urlStr =
+        '${ApiConfig.baseUrl}vendor/getbookingdata/${widget.vendorid}/Others/completed';
+    final url = Uri.parse(urlStr);
+
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    bool isOnline =
+        connectivityResult.isNotEmpty &&
+        connectivityResult.first != ConnectivityResult.none;
+
+    if (!isOnline) {
+      final cached = LocalDbService.getCachedApiResponse(urlStr);
+      if (cached != null && cached['bookings'] is List) {
+        final List<dynamic> data = cached['bookings'];
+        if (data.isEmpty) throw 'No bookings available';
+        return data
+            .map(
+              (item) => Bookingdata.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList();
+      }
+      throw 'No bookings available (offline)';
+    }
+
     final response = await http.get(url);
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonResponse = json.decode(response.body);
+      LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
       return data.map((item) => Bookingdata.fromJson(item)).toList();
     } else if (response.statusCode == 404 || response.statusCode == 400) {
       throw 'No booking found';
     } else {
-      throw 'Error fetching data: ${response.statusCode}';
+      throw 'Error fetching data: ${response?.statusCode}';
     }
   }
 
@@ -2944,6 +3477,9 @@ class _OthersTabState extends State<OthersTab>
                                 (v) => v.id == vehicle.id,
                               );
                               bookingDataNotifier.value = currentData;
+                              setState(
+                                () {},
+                              ); // Rebuild to refresh the Completed tab
                             },
                           );
                         },
@@ -3350,15 +3886,34 @@ class UniversalPrintHelper {
     return '';
   }
 
-  /// Uses passed [invoiceId] or loads from vendor/getbooking by Mongo [_id].
   static Future<String> resolveInvoiceIdForPrint({
     String? invoiceId,
     required String bookingId,
   }) async {
+    // 1. If we have a permanent offline ID mapping, ALWAYS use it first so receipts match
+    final mappedOfflineId = LocalDbService.getOfflineMappedId(bookingId);
+    if (mappedOfflineId != null && mappedOfflineId.isNotEmpty) {
+      return mappedOfflineId;
+    }
+
     final passed = (invoiceId ?? '').trim();
     if (passed.isNotEmpty) return passed;
     if (bookingId.trim().isEmpty) return '';
-    return fetchInvoiceIdForBooking(bookingId);
+
+    final fetched = await fetchInvoiceIdForBooking(bookingId);
+    if (fetched.isNotEmpty) return fetched;
+
+    // Fallback: If no invoice ID is found and it's a long Mongo ID, format it to a short ID.
+    if (bookingId.length == 24) {
+      try {
+        final counter = int.parse(bookingId.substring(18), radix: 16);
+        return 'PMW$counter';
+      } catch (_) {
+        return 'PMW${bookingId.substring(18).toUpperCase()}';
+      }
+    }
+
+    return bookingId;
   }
 
   static Future<String> fetchInvoiceIdForBooking(String bookingId) async {
@@ -3809,26 +4364,47 @@ class UniversalPrintHelper {
       }
     }
 
-    print('=== Printer detection (single pass) ===');
+    final pineLabsType = await PineLabsPrintHelper.detectPineLabsPrinter();
+    if (pineLabsType == 'pinelabs_builtin') {
+      _rememberPrinter('pinelabs_builtin');
+      return 'pinelabs_builtin';
+    }
 
-    if (await _bindAndInitSunmi()) {
+    if (await _tryBindSunmiPrinter(maxRetries: fast ? 1 : 2)) {
       _rememberPrinter('sunmi');
-      print('Built-in thermal printer ready');
       return 'sunmi';
     }
 
+    print('=== Printer detection (Bluetooth) ===');
+
     try {
+      if (await Permission.bluetoothConnect.isDenied) {
+        await Permission.bluetoothConnect.request();
+      }
+      if (await Permission.bluetoothScan.isDenied) {
+        await Permission.bluetoothScan.request();
+      }
+
       final bool bluetoothEnabled = await PrintBluetoothThermal.bluetoothEnabled
           .timeout(_btCheckTimeout);
+      print('Bluetooth enabled: $bluetoothEnabled');
       if (bluetoothEnabled) {
         final List<BluetoothInfo> printers = await PrintBluetoothThermal
             .pairedBluetooths
             .timeout(_btCheckTimeout);
+        print('Bluetooth paired printers: ${printers.length}');
+        for (var p in printers) {
+          print('Paired Printer: ${p.name} - ${p.macAdress}');
+        }
         if (printers.isNotEmpty) {
           _rememberPrinter('bluetooth', bluetoothMac: printers.first.macAdress);
           print('Bluetooth printer available: ${printers.first.name}');
           return 'bluetooth';
+        } else {
+          print('No paired Bluetooth printers found.');
         }
+      } else {
+        print('Bluetooth is NOT enabled on the device.');
       }
     } catch (e) {
       print('Bluetooth detection error: $e');
@@ -3852,6 +4428,12 @@ class UniversalPrintHelper {
   // Connect to Bluetooth printer (reuses cache + existing connection).
   static Future<bool> connectBluetoothPrinter() async {
     try {
+      if (await Permission.bluetoothConnect.isDenied) {
+        await Permission.bluetoothConnect.request();
+      }
+      if (await Permission.bluetoothScan.isDenied) {
+        await Permission.bluetoothScan.request();
+      }
       try {
         final bool alreadyConnected = await PrintBluetoothThermal
             .connectionStatus
@@ -4336,7 +4918,7 @@ class UniversalPrintHelper {
       bytes += [0x0A]; // Line feed
     }
 
-    // Separator above footer — center
+    // Separator above footer â€” center
     bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
     bytes +=
         'we are not responsible for any belongings inside and outside of the vehicle.'
@@ -4479,7 +5061,25 @@ class UniversalPrintHelper {
       final bool skipChargeLookup = fastPrint;
       final String printerType = await detectPrinterType(fast: fastPrint);
 
-      if (_isBuiltinPrinterType(printerType)) {
+      if (printerType == 'pinelabs_builtin') {
+        await PineLabsPrintHelper.printTicket(
+          vendorName: resolvedVendorName,
+          bookingId: bookingId,
+          invoiceId: resolvedInvoiceId.isNotEmpty ? resolvedInvoiceId : null,
+          vehicleType: vehicleType,
+          vehicleNumber: vehicleNumber,
+          parkingDate: parkingDate,
+          parkingTime: parkingTime,
+          amount: currentAmount,
+          personName: personName,
+          mobileNumber: mobileNumber,
+          duration: formattedDuration,
+          sts: sts,
+          bookType: bookType,
+          isEntryReceipt: formattedDuration.isEmpty,
+        );
+        return;
+      } else if (printerType == 'sumi' || printerType == 'sunmi') {
         final bool isBound =
             _sunmiBoundAndInited ||
             await _tryBindSunmiPrinter(maxRetries: fastPrint ? 1 : 2);
@@ -4713,9 +5313,12 @@ class UniversalPrintHelper {
     try {
       final printerType = await detectPrinterType();
 
-      if (printerType == 'sumi' ||
-          printerType == 'sunmi' ||
-          printerType == 'pinelabs_builtin') {
+      if (printerType == 'pinelabs_builtin') {
+        await PineLabsPrintHelper.printLines(lines);
+        return;
+      }
+
+      if (printerType == 'sumi' || printerType == 'sunmi') {
         final isBound = await _tryBindSunmiPrinter();
         if (!isBound) {
           _showError(context);
@@ -4821,7 +5424,7 @@ class UniversalPrintHelper {
 
       print('=== DEBUG getPrintAmountFromAPI ===');
       print('URL: $url');
-      print('Response status: ${response.statusCode}');
+      print('Response status: ${response?.statusCode}');
       print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
@@ -4853,7 +5456,9 @@ class UniversalPrintHelper {
 
         print('No amount field found in vendor/fet response');
       } else {
-        print('Failed to fetch amount from vendor/fet: ${response.statusCode}');
+        print(
+          'Failed to fetch amount from vendor/fet: ${response?.statusCode}',
+        );
       }
     } catch (e) {
       print('Error fetching amount from vendor/fet: $e');
@@ -5223,18 +5828,19 @@ class cardashleft extends StatelessWidget {
                                           ),
                                           child: ElevatedButton(
                                             onPressed:
-                                                () =>
-                                                    DashQuickExitHelper.handlePrintAndExit(
-                                                      context: context,
-                                                      vehicle: vehicle,
-                                                      vendorId: vendorId,
-                                                      bookType: bookType,
-                                                      defaultVendorName:
-                                                          defaultVendorName,
-                                                      paymentMode: globalSelectedPaymentModes[vehicle.id] ?? 'Online',
-                                                      onExitSuccess:
-                                                          onExitSuccess,
-                                                    ),
+                                                () => DashQuickExitHelper.handlePrintAndExit(
+                                                  context: context,
+                                                  vehicle: vehicle,
+                                                  vendorId: vendorId,
+                                                  bookType: bookType,
+                                                  defaultVendorName:
+                                                      defaultVendorName,
+                                                  paymentMode:
+                                                      globalSelectedPaymentModes[vehicle
+                                                          .id] ??
+                                                      'Online',
+                                                  onExitSuccess: onExitSuccess,
+                                                ),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.white,
                                               foregroundColor:
@@ -5310,7 +5916,10 @@ class cardashleft extends StatelessWidget {
                                                             ),
                                                       ),
                                                       child: Exitpage(
-                                                        paymentMode: globalSelectedPaymentModes[vehicle.id] ?? 'Online',
+                                                        paymentMode:
+                                                            globalSelectedPaymentModes[vehicle
+                                                                .id] ??
+                                                            'Online',
                                                         currentTabIndex:
                                                             currentTabIndex,
                                                         userid: vehicle.userid,
@@ -5318,6 +5927,11 @@ class cardashleft extends StatelessWidget {
                                                         vehicletype:
                                                             vehicle.vehicletype,
                                                         bookingid: vehicle.id,
+                                                        amount: vehicle.amount,
+                                                        isValet:
+                                                            vehicle.isValet,
+                                                        valetCharge:
+                                                            vehicle.valetCharge,
                                                         parkingdate:
                                                             vehicle.parkingDate,
                                                         vehiclenumber:
@@ -5490,50 +6104,105 @@ class cardashleft extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 5),
                                     StatefulBuilder(
-                                      builder: (BuildContext context, StateSetter setStateRadio) {
-                                        globalSelectedPaymentModes[vehicle.id] ??= 'Online';
+                                      builder: (
+                                        BuildContext context,
+                                        StateSetter setStateRadio,
+                                      ) {
+                                        globalSelectedPaymentModes[vehicle
+                                                .id] ??=
+                                            'Online';
                                         return Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Radio<String>(
                                               value: 'Online',
-                                              groupValue: globalSelectedPaymentModes[vehicle.id],
+                                              groupValue:
+                                                  globalSelectedPaymentModes[vehicle
+                                                      .id],
                                               onChanged: (value) {
                                                 setStateRadio(() {
-                                                  globalSelectedPaymentModes[vehicle.id] = value!;
+                                                  globalSelectedPaymentModes[vehicle
+                                                          .id] =
+                                                      value!;
                                                 });
                                               },
-                                              activeColor: ColorUtils.primarycolor(),
-                                              visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
-                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              activeColor:
+                                                  ColorUtils.primarycolor(),
+                                              visualDensity:
+                                                  const VisualDensity(
+                                                    horizontal:
+                                                        VisualDensity
+                                                            .minimumDensity,
+                                                    vertical:
+                                                        VisualDensity
+                                                            .minimumDensity,
+                                                  ),
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
                                             ),
                                             Text(
                                               'Online',
                                               style: GoogleFonts.poppins(
                                                 fontSize: 12,
-                                                fontWeight: globalSelectedPaymentModes[vehicle.id] == 'Online' ? FontWeight.bold : FontWeight.normal,
-                                                color: globalSelectedPaymentModes[vehicle.id] == 'Online' ? ColorUtils.primarycolor() : null,
+                                                fontWeight:
+                                                    globalSelectedPaymentModes[vehicle
+                                                                .id] ==
+                                                            'Online'
+                                                        ? FontWeight.bold
+                                                        : FontWeight.normal,
+                                                color:
+                                                    globalSelectedPaymentModes[vehicle
+                                                                .id] ==
+                                                            'Online'
+                                                        ? ColorUtils.primarycolor()
+                                                        : null,
                                               ),
                                             ),
                                             const SizedBox(width: 15),
                                             Radio<String>(
                                               value: 'Cash',
-                                              groupValue: globalSelectedPaymentModes[vehicle.id],
+                                              groupValue:
+                                                  globalSelectedPaymentModes[vehicle
+                                                      .id],
                                               onChanged: (value) {
                                                 setStateRadio(() {
-                                                  globalSelectedPaymentModes[vehicle.id] = value!;
+                                                  globalSelectedPaymentModes[vehicle
+                                                          .id] =
+                                                      value!;
                                                 });
                                               },
-                                              activeColor: ColorUtils.primarycolor(),
-                                              visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
-                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              activeColor:
+                                                  ColorUtils.primarycolor(),
+                                              visualDensity:
+                                                  const VisualDensity(
+                                                    horizontal:
+                                                        VisualDensity
+                                                            .minimumDensity,
+                                                    vertical:
+                                                        VisualDensity
+                                                            .minimumDensity,
+                                                  ),
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
                                             ),
                                             Text(
                                               'Cash',
                                               style: GoogleFonts.poppins(
                                                 fontSize: 12,
-                                                fontWeight: globalSelectedPaymentModes[vehicle.id] == 'Cash' ? FontWeight.bold : FontWeight.normal,
-                                                color: globalSelectedPaymentModes[vehicle.id] == 'Cash' ? ColorUtils.primarycolor() : null,
+                                                fontWeight:
+                                                    globalSelectedPaymentModes[vehicle
+                                                                .id] ==
+                                                            'Cash'
+                                                        ? FontWeight.bold
+                                                        : FontWeight.normal,
+                                                color:
+                                                    globalSelectedPaymentModes[vehicle
+                                                                .id] ==
+                                                            'Cash'
+                                                        ? ColorUtils.primarycolor()
+                                                        : null,
                                               ),
                                             ),
                                           ],
@@ -5554,7 +6223,7 @@ class cardashleft extends StatelessWidget {
                                         ),
                                       ),
                                       Text(
-                                        "₹${vehicle.currentCalculatedAmount}",
+                                        "â‚¹${vehicle.currentCalculatedAmount}",
                                         style: GoogleFonts.poppins(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
@@ -5578,6 +6247,10 @@ class cardashleft extends StatelessWidget {
                                 ),
                               ],
                             ),
+                          ),
+                          VehicleImageThumbnail(
+                            images: vehicle.vehicleImages,
+                            vehicleNumber: vehicle.vehicleNumber,
                           ),
                         ],
                       ),
@@ -5945,18 +6618,19 @@ class bikedashleft extends StatelessWidget {
                                           ),
                                           child: ElevatedButton(
                                             onPressed:
-                                                () =>
-                                                    DashQuickExitHelper.handlePrintAndExit(
-                                                      context: context,
-                                                      vehicle: vehicle,
-                                                      vendorId: vendorId,
-                                                      bookType: bookType,
-                                                      defaultVendorName:
-                                                          defaultVendorName,
-                                                      paymentMode: globalSelectedPaymentModes[vehicle.id] ?? 'Online',
-                                                      onExitSuccess:
-                                                          onExitSuccess,
-                                                    ),
+                                                () => DashQuickExitHelper.handlePrintAndExit(
+                                                  context: context,
+                                                  vehicle: vehicle,
+                                                  vendorId: vendorId,
+                                                  bookType: bookType,
+                                                  defaultVendorName:
+                                                      defaultVendorName,
+                                                  paymentMode:
+                                                      globalSelectedPaymentModes[vehicle
+                                                          .id] ??
+                                                      'Online',
+                                                  onExitSuccess: onExitSuccess,
+                                                ),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.white,
                                               foregroundColor:
@@ -6032,7 +6706,10 @@ class bikedashleft extends StatelessWidget {
                                                             ),
                                                       ),
                                                       child: Exitpage(
-                                                        paymentMode: globalSelectedPaymentModes[vehicle.id] ?? 'Online',
+                                                        paymentMode:
+                                                            globalSelectedPaymentModes[vehicle
+                                                                .id] ??
+                                                            'Online',
                                                         currentTabIndex:
                                                             currentTabIndex,
                                                         userid: vehicle.userid,
@@ -6040,6 +6717,11 @@ class bikedashleft extends StatelessWidget {
                                                         vehicletype:
                                                             vehicle.vehicletype,
                                                         bookingid: vehicle.id,
+                                                        amount: vehicle.amount,
+                                                        isValet:
+                                                            vehicle.isValet,
+                                                        valetCharge:
+                                                            vehicle.valetCharge,
                                                         parkingdate:
                                                             vehicle.parkingDate,
                                                         vehiclenumber:
@@ -6212,50 +6894,105 @@ class bikedashleft extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 5),
                                     StatefulBuilder(
-                                      builder: (BuildContext context, StateSetter setStateRadio) {
-                                        globalSelectedPaymentModes[vehicle.id] ??= 'Online';
+                                      builder: (
+                                        BuildContext context,
+                                        StateSetter setStateRadio,
+                                      ) {
+                                        globalSelectedPaymentModes[vehicle
+                                                .id] ??=
+                                            'Online';
                                         return Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Radio<String>(
                                               value: 'Online',
-                                              groupValue: globalSelectedPaymentModes[vehicle.id],
+                                              groupValue:
+                                                  globalSelectedPaymentModes[vehicle
+                                                      .id],
                                               onChanged: (value) {
                                                 setStateRadio(() {
-                                                  globalSelectedPaymentModes[vehicle.id] = value!;
+                                                  globalSelectedPaymentModes[vehicle
+                                                          .id] =
+                                                      value!;
                                                 });
                                               },
-                                              activeColor: ColorUtils.primarycolor(),
-                                              visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
-                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              activeColor:
+                                                  ColorUtils.primarycolor(),
+                                              visualDensity:
+                                                  const VisualDensity(
+                                                    horizontal:
+                                                        VisualDensity
+                                                            .minimumDensity,
+                                                    vertical:
+                                                        VisualDensity
+                                                            .minimumDensity,
+                                                  ),
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
                                             ),
                                             Text(
                                               'Online',
                                               style: GoogleFonts.poppins(
                                                 fontSize: 12,
-                                                fontWeight: globalSelectedPaymentModes[vehicle.id] == 'Online' ? FontWeight.bold : FontWeight.normal,
-                                                color: globalSelectedPaymentModes[vehicle.id] == 'Online' ? ColorUtils.primarycolor() : null,
+                                                fontWeight:
+                                                    globalSelectedPaymentModes[vehicle
+                                                                .id] ==
+                                                            'Online'
+                                                        ? FontWeight.bold
+                                                        : FontWeight.normal,
+                                                color:
+                                                    globalSelectedPaymentModes[vehicle
+                                                                .id] ==
+                                                            'Online'
+                                                        ? ColorUtils.primarycolor()
+                                                        : null,
                                               ),
                                             ),
                                             const SizedBox(width: 15),
                                             Radio<String>(
                                               value: 'Cash',
-                                              groupValue: globalSelectedPaymentModes[vehicle.id],
+                                              groupValue:
+                                                  globalSelectedPaymentModes[vehicle
+                                                      .id],
                                               onChanged: (value) {
                                                 setStateRadio(() {
-                                                  globalSelectedPaymentModes[vehicle.id] = value!;
+                                                  globalSelectedPaymentModes[vehicle
+                                                          .id] =
+                                                      value!;
                                                 });
                                               },
-                                              activeColor: ColorUtils.primarycolor(),
-                                              visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
-                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              activeColor:
+                                                  ColorUtils.primarycolor(),
+                                              visualDensity:
+                                                  const VisualDensity(
+                                                    horizontal:
+                                                        VisualDensity
+                                                            .minimumDensity,
+                                                    vertical:
+                                                        VisualDensity
+                                                            .minimumDensity,
+                                                  ),
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
                                             ),
                                             Text(
                                               'Cash',
                                               style: GoogleFonts.poppins(
                                                 fontSize: 12,
-                                                fontWeight: globalSelectedPaymentModes[vehicle.id] == 'Cash' ? FontWeight.bold : FontWeight.normal,
-                                                color: globalSelectedPaymentModes[vehicle.id] == 'Cash' ? ColorUtils.primarycolor() : null,
+                                                fontWeight:
+                                                    globalSelectedPaymentModes[vehicle
+                                                                .id] ==
+                                                            'Cash'
+                                                        ? FontWeight.bold
+                                                        : FontWeight.normal,
+                                                color:
+                                                    globalSelectedPaymentModes[vehicle
+                                                                .id] ==
+                                                            'Cash'
+                                                        ? ColorUtils.primarycolor()
+                                                        : null,
                                               ),
                                             ),
                                           ],
@@ -6276,7 +7013,7 @@ class bikedashleft extends StatelessWidget {
                                         ),
                                       ),
                                       Text(
-                                        "₹${vehicle.currentCalculatedAmount}",
+                                        "â‚¹${vehicle.currentCalculatedAmount}",
                                         style: GoogleFonts.poppins(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
@@ -6300,6 +7037,10 @@ class bikedashleft extends StatelessWidget {
                                 ),
                               ],
                             ),
+                          ),
+                          VehicleImageThumbnail(
+                            images: vehicle.vehicleImages,
+                            vehicleNumber: vehicle.vehicleNumber,
                           ),
                         ],
                       ),
@@ -6667,18 +7408,19 @@ class othersdashleft extends StatelessWidget {
                                           ),
                                           child: ElevatedButton(
                                             onPressed:
-                                                () =>
-                                                    DashQuickExitHelper.handlePrintAndExit(
-                                                      context: context,
-                                                      vehicle: vehicle,
-                                                      vendorId: vendorId,
-                                                      bookType: bookType,
-                                                      defaultVendorName:
-                                                          defaultVendorName,
-                                                      paymentMode: globalSelectedPaymentModes[vehicle.id] ?? 'Online',
-                                                      onExitSuccess:
-                                                          onExitSuccess,
-                                                    ),
+                                                () => DashQuickExitHelper.handlePrintAndExit(
+                                                  context: context,
+                                                  vehicle: vehicle,
+                                                  vendorId: vendorId,
+                                                  bookType: bookType,
+                                                  defaultVendorName:
+                                                      defaultVendorName,
+                                                  paymentMode:
+                                                      globalSelectedPaymentModes[vehicle
+                                                          .id] ??
+                                                      'Online',
+                                                  onExitSuccess: onExitSuccess,
+                                                ),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.white,
                                               foregroundColor:
@@ -6754,7 +7496,10 @@ class othersdashleft extends StatelessWidget {
                                                             ),
                                                       ),
                                                       child: Exitpage(
-                                                        paymentMode: globalSelectedPaymentModes[vehicle.id] ?? 'Online',
+                                                        paymentMode:
+                                                            globalSelectedPaymentModes[vehicle
+                                                                .id] ??
+                                                            'Online',
                                                         currentTabIndex:
                                                             currentTabIndex,
                                                         userid: vehicle.userid,
@@ -6762,6 +7507,11 @@ class othersdashleft extends StatelessWidget {
                                                         vehicletype:
                                                             vehicle.vehicletype,
                                                         bookingid: vehicle.id,
+                                                        amount: vehicle.amount,
+                                                        isValet:
+                                                            vehicle.isValet,
+                                                        valetCharge:
+                                                            vehicle.valetCharge,
                                                         parkingdate:
                                                             vehicle.parkingDate,
                                                         vehiclenumber:
@@ -6934,50 +7684,105 @@ class othersdashleft extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 5),
                                     StatefulBuilder(
-                                      builder: (BuildContext context, StateSetter setStateRadio) {
-                                        globalSelectedPaymentModes[vehicle.id] ??= 'Online';
+                                      builder: (
+                                        BuildContext context,
+                                        StateSetter setStateRadio,
+                                      ) {
+                                        globalSelectedPaymentModes[vehicle
+                                                .id] ??=
+                                            'Online';
                                         return Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Radio<String>(
                                               value: 'Online',
-                                              groupValue: globalSelectedPaymentModes[vehicle.id],
+                                              groupValue:
+                                                  globalSelectedPaymentModes[vehicle
+                                                      .id],
                                               onChanged: (value) {
                                                 setStateRadio(() {
-                                                  globalSelectedPaymentModes[vehicle.id] = value!;
+                                                  globalSelectedPaymentModes[vehicle
+                                                          .id] =
+                                                      value!;
                                                 });
                                               },
-                                              activeColor: ColorUtils.primarycolor(),
-                                              visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
-                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              activeColor:
+                                                  ColorUtils.primarycolor(),
+                                              visualDensity:
+                                                  const VisualDensity(
+                                                    horizontal:
+                                                        VisualDensity
+                                                            .minimumDensity,
+                                                    vertical:
+                                                        VisualDensity
+                                                            .minimumDensity,
+                                                  ),
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
                                             ),
                                             Text(
                                               'Online',
                                               style: GoogleFonts.poppins(
                                                 fontSize: 12,
-                                                fontWeight: globalSelectedPaymentModes[vehicle.id] == 'Online' ? FontWeight.bold : FontWeight.normal,
-                                                color: globalSelectedPaymentModes[vehicle.id] == 'Online' ? ColorUtils.primarycolor() : null,
+                                                fontWeight:
+                                                    globalSelectedPaymentModes[vehicle
+                                                                .id] ==
+                                                            'Online'
+                                                        ? FontWeight.bold
+                                                        : FontWeight.normal,
+                                                color:
+                                                    globalSelectedPaymentModes[vehicle
+                                                                .id] ==
+                                                            'Online'
+                                                        ? ColorUtils.primarycolor()
+                                                        : null,
                                               ),
                                             ),
                                             const SizedBox(width: 15),
                                             Radio<String>(
                                               value: 'Cash',
-                                              groupValue: globalSelectedPaymentModes[vehicle.id],
+                                              groupValue:
+                                                  globalSelectedPaymentModes[vehicle
+                                                      .id],
                                               onChanged: (value) {
                                                 setStateRadio(() {
-                                                  globalSelectedPaymentModes[vehicle.id] = value!;
+                                                  globalSelectedPaymentModes[vehicle
+                                                          .id] =
+                                                      value!;
                                                 });
                                               },
-                                              activeColor: ColorUtils.primarycolor(),
-                                              visualDensity: const VisualDensity(horizontal: VisualDensity.minimumDensity, vertical: VisualDensity.minimumDensity),
-                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              activeColor:
+                                                  ColorUtils.primarycolor(),
+                                              visualDensity:
+                                                  const VisualDensity(
+                                                    horizontal:
+                                                        VisualDensity
+                                                            .minimumDensity,
+                                                    vertical:
+                                                        VisualDensity
+                                                            .minimumDensity,
+                                                  ),
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
                                             ),
                                             Text(
                                               'Cash',
                                               style: GoogleFonts.poppins(
                                                 fontSize: 12,
-                                                fontWeight: globalSelectedPaymentModes[vehicle.id] == 'Cash' ? FontWeight.bold : FontWeight.normal,
-                                                color: globalSelectedPaymentModes[vehicle.id] == 'Cash' ? ColorUtils.primarycolor() : null,
+                                                fontWeight:
+                                                    globalSelectedPaymentModes[vehicle
+                                                                .id] ==
+                                                            'Cash'
+                                                        ? FontWeight.bold
+                                                        : FontWeight.normal,
+                                                color:
+                                                    globalSelectedPaymentModes[vehicle
+                                                                .id] ==
+                                                            'Cash'
+                                                        ? ColorUtils.primarycolor()
+                                                        : null,
                                               ),
                                             ),
                                           ],
@@ -7000,7 +7805,7 @@ class othersdashleft extends StatelessWidget {
                                         ),
                                       ),
                                       Text(
-                                        " ₹${vehicle.currentCalculatedAmount}",
+                                        " â‚¹${vehicle.currentCalculatedAmount}",
                                         style: GoogleFonts.poppins(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
@@ -7024,6 +7829,10 @@ class othersdashleft extends StatelessWidget {
                                 ),
                               ],
                             ),
+                          ),
+                          VehicleImageThumbnail(
+                            images: vehicle.vehicleImages,
+                            vehicleNumber: vehicle.vehicleNumber,
                           ),
                         ],
                       ),
@@ -7617,6 +8426,10 @@ class vendordashright extends StatelessWidget {
                               ],
                             ),
                           ),
+                          VehicleImageThumbnail(
+                            images: vehicle.vehicleImages,
+                            vehicleNumber: vehicle.vehicleNumber,
+                          ),
                         ],
                       ),
                     ],
@@ -7733,6 +8546,7 @@ class Bookingdata {
   final String valetCharge;
   String? currentCalculatedAmount;
   String uiPaymentMode = 'Online';
+  final List<String> vehicleImages;
   Bookingdata({
     required this.totalamout,
     required this.amount,
@@ -7772,6 +8586,7 @@ class Bookingdata {
     this.isValet = false,
     this.valetCharge = "0",
     this.currentCalculatedAmount,
+    this.vehicleImages = const [],
   });
 
   // Factory constructor to parse JSON
@@ -7782,6 +8597,15 @@ class Bookingdata {
         '';
     final rawTotal =
         json['totalamout']?.toString() ?? json['totalAmount']?.toString() ?? '';
+    final parsedVehicleImages =
+        (json['vehicleImages'] as List<dynamic>?)
+            ?.map((e) => e.toString().trim())
+            .where((url) => url.isNotEmpty)
+            .toList() ??
+        (json['vehicleImage'] != null &&
+                json['vehicleImage'].toString().trim().isNotEmpty
+            ? [json['vehicleImage'].toString().trim()]
+            : const <String>[]);
     return Bookingdata(
       invoiceid: (json['invoiceid'] ?? json['invoiceId'] ?? '').toString(),
       paymentmode:
@@ -7818,10 +8642,11 @@ class Bookingdata {
       bookType: json['bookType'] ?? "",
       exitvehicledate: json['exitvehicledate'] ?? '',
       exitvehicletime: json['exitvehicletime'] ?? '',
+      isValet: json['isValet'] == true || json['isValet'] == 'true',
+      valetCharge: json['valetCharge']?.toString() ?? "0",
       subscriptionenddate: json['subsctiptionenddate'] ?? '',
       cancelledStatus: json['cancelledStatus'],
-      isValet: json['isValet'] ?? false,
-      valetCharge: json['valetCharge']?.toString() ?? "0",
+      vehicleImages: parsedVehicleImages,
       currentCalculatedAmount: null,
     );
   }
@@ -7975,22 +8800,61 @@ class DashQuickExitHelper {
       } catch (_) {}
     }
 
-    final response = await http
-        .put(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(requestBody),
-        )
-        .timeout(const Duration(seconds: 15));
+    try {
+      final response = await http
+          .put(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(requestBody),
+          )
+          .timeout(const Duration(seconds: 15));
 
-    if (response.statusCode == 200) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Vehicle exited successfully ($paymentMode)!')),
-        );
+      if (response.statusCode == 200) {
+        GlobalVendorSearchCache.allVendors = [];
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Vehicle exited successfully ($paymentMode)!'),
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to exit vehicle (${response.statusCode})');
       }
-    } else {
-      throw Exception('Failed to exit vehicle (${response.statusCode})');
+    } catch (e) {
+      final isOffline =
+          e.toString().contains('SocketException') ||
+          e.toString().contains('TimeoutException');
+      if (isOffline) {
+        // Offline Exit Flow
+        await LocalDbService.addPendingAction({
+          'type': 'EXIT_BOOKING',
+          'offline_id': bookingId,
+          'payload': {'bookingId': bookingId, ...requestBody},
+        });
+        await LocalDbService.markBookingCompletedOffline(
+          bookingId,
+          amount: double.tryParse(
+            requestBody['totalamout']?.toString() ??
+                requestBody['amount']?.toString() ??
+                '0',
+          ),
+          paymentMode: paymentMode,
+        );
+        GlobalVendorSearchCache.allVendors = [];
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Vehicle exited offline ($paymentMode)! Will sync later.',
+              ),
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to exit vehicle: $e');
+      }
     }
   }
 

@@ -1,6 +1,6 @@
 import 'dart:async'; // Import this for Completer
 import 'dart:convert';
-import 'dart:io' show Platform;
+import 'dart:io';
 import 'package:audioplayers/audioplayers.dart' show AssetSource, AudioPlayer;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -10,6 +10,9 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:mywheels/services/local_db_service.dart';
+import 'package:mywheels/services/sync_service.dart';
 import 'auth/customer/Notification.dart';
 import 'auth/customer/customerdash.dart';
 import 'auth/customer/parking/parking.dart';
@@ -17,8 +20,9 @@ import 'auth/customer/splashregister/register.dart';
 import 'auth/vendor/vendordash.dart';
 import 'auth/vendor/vendornotificationpage.dart';
 import 'config/app_version_checker.dart';
+
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-FlutterLocalNotificationsPlugin();
+    FlutterLocalNotificationsPlugin();
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -32,11 +36,17 @@ Future<void> navigateToNotificationPage() async {
   final context = navigatorKey.currentContext;
   if (context == null) return;
   if (userId != null && userId.isNotEmpty) {
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => NotificationScreen(userid: userId)));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => NotificationScreen(userid: userId)),
+    );
   } else if (vendorId != null && vendorId.isNotEmpty) {
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => VendorNotificationScreen(vendorid: vendorId)));
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VendorNotificationScreen(vendorid: vendorId),
+      ),
+    );
   }
 }
 
@@ -53,8 +63,10 @@ Future<void> _handleNotificationTap(String? payload) async {
       final data = jsonDecode(payload) as Map<String, dynamic>?;
       final type = data?['type'] as String?;
       if (type == 'booking_slot' && userId != null && userId.isNotEmpty) {
-        Navigator.push(context, MaterialPageRoute(
-          builder: (_) => ParkingPage(userId: userId)));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ParkingPage(userId: userId)),
+        );
         return;
       }
     } catch (_) {}
@@ -69,9 +81,21 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print('Handling a background message: ${message.messageId}');
 }
 
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+  }
+}
+
 void main() async {
+  HttpOverrides.global = MyHttpOverrides();
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await LocalDbService.init();
+  SyncService().initialize();
   // Timer(Duration(seconds: 2), () {
   //   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
   // });
@@ -80,12 +104,16 @@ void main() async {
   //   DeviceOrientation.portraitDown
   // ]);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent, // Transparent status bar
-    statusBarIconBrightness: Brightness.dark, // Dark icons for light backgrounds
-    systemNavigationBarColor: Colors.transparent, // Transparent navigation bar
-    systemNavigationBarIconBrightness: Brightness.dark,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent, // Transparent status bar
+      statusBarIconBrightness:
+          Brightness.dark, // Dark icons for light backgrounds
+      systemNavigationBarColor:
+          Colors.transparent, // Transparent navigation bar
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   const AndroidInitializationSettings initSettingsAndroid =
@@ -108,15 +136,19 @@ void main() async {
     importance: Importance.high,
   );
   await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >()
       ?.createNotificationChannel(channel);
 
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     // Derive title/body from notification payload or data-only payload
-    final String title = message.notification?.title ??
+    final String title =
+        message.notification?.title ??
         message.data['title']?.toString() ??
         'Notification';
-    final String body = message.notification?.body ??
+    final String body =
+        message.notification?.body ??
         message.data['body']?.toString() ??
         message.data['message']?.toString() ??
         '';
@@ -124,47 +156,54 @@ void main() async {
     if (title.isEmpty && body.isEmpty) return;
 
     final payload = jsonEncode(message.data);
-    final int notificationId = DateTime.now().millisecondsSinceEpoch % 2147483647;
+    final int notificationId =
+        DateTime.now().millisecondsSinceEpoch % 2147483647;
 
     final NotificationDetails detailsWithBell = NotificationDetails(
-      android: Platform.isAndroid
-          ? AndroidNotificationDetails(
-              'high_importance_channel',
-              'High Importance Notifications',
-              channelDescription: 'This channel is used for important notifications.',
-              importance: Importance.high,
-              priority: Priority.high,
-              icon: '@mipmap/ic_launcher',
-              playSound: true,
-              sound: RawResourceAndroidNotificationSound('bell'),
-            )
-          : null,
-      iOS: Platform.isIOS
-          ? const DarwinNotificationDetails(
-              presentAlert: true,
-              presentSound: true,
-            )
-          : null,
+      android:
+          Platform.isAndroid
+              ? AndroidNotificationDetails(
+                'high_importance_channel',
+                'High Importance Notifications',
+                channelDescription:
+                    'This channel is used for important notifications.',
+                importance: Importance.high,
+                priority: Priority.high,
+                icon: '@mipmap/ic_launcher',
+                playSound: true,
+                sound: RawResourceAndroidNotificationSound('bell'),
+              )
+              : null,
+      iOS:
+          Platform.isIOS
+              ? const DarwinNotificationDetails(
+                presentAlert: true,
+                presentSound: true,
+              )
+              : null,
     );
 
     final NotificationDetails detailsDefaultSound = NotificationDetails(
-      android: Platform.isAndroid
-          ? const AndroidNotificationDetails(
-              'high_importance_channel',
-              'High Importance Notifications',
-              channelDescription: 'This channel is used for important notifications.',
-              importance: Importance.high,
-              priority: Priority.high,
-              icon: '@mipmap/ic_launcher',
-              playSound: true,
-            )
-          : null,
-      iOS: Platform.isIOS
-          ? const DarwinNotificationDetails(
-              presentAlert: true,
-              presentSound: true,
-            )
-          : null,
+      android:
+          Platform.isAndroid
+              ? const AndroidNotificationDetails(
+                'high_importance_channel',
+                'High Importance Notifications',
+                channelDescription:
+                    'This channel is used for important notifications.',
+                importance: Importance.high,
+                priority: Priority.high,
+                icon: '@mipmap/ic_launcher',
+                playSound: true,
+              )
+              : null,
+      iOS:
+          Platform.isIOS
+              ? const DarwinNotificationDetails(
+                presentAlert: true,
+                presentSound: true,
+              )
+              : null,
     );
 
     Future<void> showWithFallback() async {
@@ -186,6 +225,7 @@ void main() async {
         );
       }
     }
+
     showWithFallback();
   });
 
@@ -214,7 +254,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return GetMaterialApp(
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
@@ -230,7 +269,8 @@ class SplashScreen extends StatefulWidget {
   _SplashScreenState createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   final Completer<void> _audioCompleter = Completer<void>();
   late AnimationController _animationController;
   late List<Animation<double>> _letterAnimations;
@@ -241,6 +281,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _playLogoSound();
+    _requestPermissions();
 
     _animationController = AnimationController(
       vsync: this,
@@ -249,7 +290,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _letterAnimations = List.generate(
       _text.length,
-          (index) => Tween<double>(begin: 1.0, end: 0.0).animate(
+      (index) => Tween<double>(begin: 1.0, end: 0.0).animate(
         CurvedAnimation(
           parent: _animationController,
           curve: Interval(
@@ -269,6 +310,22 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       }
       await _navigateToNextScreen();
     });
+  }
+
+  Future<void> _requestPermissions() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool permissionsRequested = prefs.getBool('permissionsRequested') ?? false;
+
+    if (!permissionsRequested) {
+      await [
+        Permission.location,
+        Permission.camera,
+        Permission.bluetoothConnect,
+        Permission.bluetoothScan,
+        Permission.notification,
+      ].request();
+      await prefs.setBool('permissionsRequested', true);
+    }
   }
 
   Future<void> _playLogoSound() async {
@@ -293,10 +350,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       _pendingNotificationPayload = null;
 
       if (mounted) {
-        Get.off(() => FadeInScreen(
-          initialScreen: initialScreen,
-          pendingNotificationPayload: pendingPayload,
-        ));
+        Get.off(
+          () => FadeInScreen(
+            initialScreen: initialScreen,
+            pendingNotificationPayload: pendingPayload,
+          ),
+        );
       }
     } catch (e) {
       debugPrint("Error navigating to next screen: $e");
@@ -318,7 +377,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 90.0,right: 90),
+              padding: const EdgeInsets.only(left: 90.0, right: 90),
               child: Image.asset('assets/gifload.gif'),
             ),
             const SizedBox(height: 5),
@@ -329,11 +388,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   text: TextSpan(
                     children: List.generate(
                       _text.length,
-                          (index) => WidgetSpan(
+                      (index) => WidgetSpan(
                         child: Transform.translate(
-                          offset: Offset(_letterAnimations[index].value * 50, 0), // Moves from right
+                          offset: Offset(
+                            _letterAnimations[index].value * 50,
+                            0,
+                          ), // Moves from right
                           child: Opacity(
-                            opacity: 1.0 - _letterAnimations[index].value, // Fades in
+                            opacity:
+                                1.0 -
+                                _letterAnimations[index].value, // Fades in
                             child: Text(
                               _text[index],
                               style: GoogleFonts.poppins(
@@ -392,7 +456,8 @@ class FadeInScreen extends StatefulWidget {
   _FadeInScreenState createState() => _FadeInScreenState();
 }
 
-class _FadeInScreenState extends State<FadeInScreen> with SingleTickerProviderStateMixin {
+class _FadeInScreenState extends State<FadeInScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _opacityAnimation;
 
@@ -405,12 +470,10 @@ class _FadeInScreenState extends State<FadeInScreen> with SingleTickerProviderSt
       vsync: this,
     );
 
-    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeIn,
-      ),
-    );
+    _opacityAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
 
     _controller.forward();
 

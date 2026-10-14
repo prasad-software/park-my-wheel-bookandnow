@@ -12,6 +12,7 @@ import '../../../config/authconfig.dart';
 import '../../../config/colorcode.dart';
 import 'package:http/http.dart' as http;
 import 'package:mywheels/utils/sts_utils.dart';
+import 'package:mywheels/utils/vehicle_image_widget.dart';
 
 import '../../customer/parking/parkindetails.dart';
 class managebooking extends StatefulWidget {
@@ -1132,6 +1133,10 @@ class _BookingCardState extends State<BookingCard> {
                               ),
                             ],
                           ),
+                        ),
+                        VehicleImageThumbnail(
+                          images: widget.vehicle.vehicleImages,
+                          vehicleNumber: widget.vehicle.vehicleNumber,
                         ),
                       ],
                     ),
