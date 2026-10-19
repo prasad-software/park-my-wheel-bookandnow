@@ -195,27 +195,82 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
   }
 
   DateTime? _combineDateTime(String date, String time) {
-    try {
-      // Try multiple formats for time
-      // Standardize input string to handle lowercase am/pm
-      final combined = '$date $time'.toUpperCase();
-      try {
-        return DateFormat('dd-MM-yyyy hh:mm a').parse(combined);
-      } catch (_) {
-        try {
-          return DateFormat('dd-MM-yyyy HH:mm').parse(combined);
-        } catch (_) {
-          try {
-            return DateFormat('d-M-yyyy hh:mm a').parse(combined);
-          } catch (_) {
-            return DateFormat('d-M-yyyy HH:mm').parse(combined);
-          }
-        }
-      }
-    } catch (e) {
-      print('Error combining date time ($date $time): $e');
-      return null;
+    final d = date.trim();
+    final t = time.trim();
+    if (d.isEmpty || d.toLowerCase() == 'null') return null;
+
+    final isoFromDate = DateTime.tryParse(d);
+    if (isoFromDate != null && (t.isEmpty || t.toLowerCase() == 'null')) {
+      return isoFromDate;
     }
+
+    final combined =
+        (t.isEmpty || t.toLowerCase() == 'null')
+            ? d
+            : '$d $t'.replaceAll(RegExp(r'\s+'), ' ').trim().toUpperCase();
+
+    final isoFromCombined = DateTime.tryParse(combined);
+    if (isoFromCombined != null) return isoFromCombined;
+
+    const formats = [
+      'dd-MM-yyyy hh:mm:ss a',
+      'dd-MM-yyyy hh:mm a',
+      'dd-MM-yyyy h:mm:ss a',
+      'dd-MM-yyyy h:mm a',
+      'dd-MM-yyyy HH:mm:ss',
+      'dd-MM-yyyy HH:mm:ss.SSS',
+      'dd-MM-yyyy HH:mm',
+      'd-M-yyyy hh:mm:ss a',
+      'd-M-yyyy hh:mm a',
+      'd-M-yyyy h:mm:ss a',
+      'd-M-yyyy h:mm a',
+      'd-M-yyyy HH:mm:ss',
+      'd-M-yyyy HH:mm',
+      'yyyy-MM-dd hh:mm:ss a',
+      'yyyy-MM-dd hh:mm a',
+      'yyyy-MM-dd HH:mm:ss',
+      'yyyy-MM-dd HH:mm',
+      'yyyy-MM-dd',
+      'dd-MM-yyyy',
+      'd-M-yyyy',
+    ];
+
+    for (final fmt in formats) {
+      try {
+        return DateFormat(fmt).parse(combined);
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  bool _isBookingExited(Bookingdata b) {
+    final status = b.status.trim().toUpperCase();
+    final exitDate = b.exitvehicledate.trim();
+    final exitTime = b.exitvehicletime.trim();
+
+    final hasExitDate = exitDate.isNotEmpty && exitDate.toLowerCase() != 'null';
+    final hasExitTime = exitTime.isNotEmpty && exitTime.toLowerCase() != 'null';
+
+    if (status == 'COMPLETED') {
+      return true;
+    }
+
+    if (GlobalRecentExits.exitedBookingIds.contains(b.id)) {
+      return true;
+    }
+
+    // If it has valid exit date/time and is not in an active parked/booked status
+    if (hasExitDate &&
+        hasExitTime &&
+        status != 'PARKED' &&
+        status != 'BOOKED' &&
+        status != 'PENDING' &&
+        status != 'APPROVED' &&
+        status != 'ACTIVE') {
+      return true;
+    }
+
+    return false;
   }
 
   @override
@@ -239,12 +294,17 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
           connectivityResult.isNotEmpty &&
           connectivityResult.first != ConnectivityResult.none;
 
-      final start = DateFormat(
+      final effectiveStart = _selectedStartDate ?? _defaultStartDate;
+      final effectiveEnd = _selectedEndDate ?? _defaultEndDate;
+
+      // Buffer API query by 1 day on both sides to handle UTC vs IST timezone disparities (e.g. 12:00 AM - 05:30 AM IST).
+      // Exact filtering is performed locally in _filteredBookings() and _computeTotals().
+      final queryStart = DateFormat(
         'dd-MM-yyyy',
-      ).format(_selectedStartDate ?? _defaultStartDate);
-      final end = DateFormat(
+      ).format(effectiveStart.subtract(const Duration(days: 1)));
+      final queryEnd = DateFormat(
         'dd-MM-yyyy',
-      ).format(_selectedEndDate ?? _defaultEndDate);
+      ).format(effectiveEnd.add(const Duration(days: 1)));
 
       List<Bookingdata> list = [];
       bool fetchSuccess = false;
@@ -252,7 +312,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
       if (isOnline) {
         try {
           final url = Uri.parse(
-            '${ApiConfig.baseUrl}vendor/fast-summary/${widget.vendorid}?startDate=$start&endDate=$end',
+            '${ApiConfig.baseUrl}vendor/fast-summary/${widget.vendorid}?startDate=$queryStart&endDate=$queryEnd',
           );
           final response = await http
               .get(url)
@@ -357,10 +417,18 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
               initialSelectedRange: initialRange,
               onSelectionChanged: (DateRangePickerSelectionChangedArgs args) {
                 if (args.value is PickerDateRange) {
+                  final s = args.value.startDate as DateTime?;
+                  final e =
+                      (args.value.endDate ?? args.value.startDate) as DateTime?;
                   setState(() {
-                    _selectedStartDate = args.value.startDate;
+                    _selectedStartDate =
+                        s != null
+                            ? DateTime(s.year, s.month, s.day, 0, 0, 0)
+                            : null;
                     _selectedEndDate =
-                        args.value.endDate ?? args.value.startDate;
+                        e != null
+                            ? DateTime(e.year, e.month, e.day, 23, 59, 59, 999)
+                            : null;
                   });
                 }
               },
@@ -438,54 +506,85 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
     }
   }
 
+  bool _isDateTimeAfterStart(DateTime dt, DateTime start, bool isFirstReport) {
+    if (isFirstReport) {
+      return dt.isAtSameMomentAs(start) || dt.isAfter(start);
+    }
+    // For subsequent reports, start represents the cutoff of the previous report.
+    // If dt is at or before start, it was already included in the previous report.
+    if (dt.isBefore(start) || dt.isAtSameMomentAs(start)) {
+      return false;
+    }
+    // If start is at minute precision (seconds == 0 and ms == 0),
+    // any booking occurring in that same minute (e.g. 15:52:15 when cutoff is 15:52:00)
+    // was already covered in that previous report.
+    if (start.second == 0 && start.millisecond == 0) {
+      if (dt.year == start.year &&
+          dt.month == start.month &&
+          dt.day == start.day &&
+          dt.hour == start.hour &&
+          dt.minute == start.minute) {
+        return false;
+      }
+    }
+    return dt.isAfter(start);
+  }
+
   List<Bookingdata> _filteredBookings() {
     DateTime start = _selectedStartDate ?? _defaultStartDate;
     DateTime end = _selectedEndDate ?? _defaultEndDate;
 
     if (_isFirstReport) {
       start = DateTime(start.year, start.month, start.day, 0, 0, 0);
-      end = DateTime(end.year, end.month, end.day, 23, 59, 59);
+      end = DateTime(end.year, end.month, end.day, 23, 59, 59, 999);
+    } else {
+      final now = DateTime.now();
+      if (end.isBefore(now)) {
+        end = now.add(const Duration(minutes: 5));
+      }
     }
 
     return _bookings.where((b) {
       if (b.Vendorid != widget.vendorid) return false;
 
-      final bookingDateTime = _combineDateTime(b.bookingDate, b.bookingTime);
-      final exitDateTime =
-          (b.exitvehicledate.trim().isNotEmpty &&
-                  b.exitvehicletime.trim().isNotEmpty)
-              ? _combineDateTime(b.exitvehicledate, b.exitvehicletime)
-              : null;
+      final bookingDateTime = _combineDateTime(
+        b.bookingDate.isNotEmpty ? b.bookingDate : (b.parkeddate.isNotEmpty ? b.parkeddate : b.parkingDate),
+        b.bookingTime.isNotEmpty ? b.bookingTime : (b.parkedtime.isNotEmpty ? b.parkedtime : b.parkingTime),
+      );
+      final exitDateTime = _combineDateTime(
+        b.exitvehicledate,
+        b.exitvehicletime,
+      ) ?? bookingDateTime;
 
       bool isBookedInRange = false;
       if (bookingDateTime != null) {
         isBookedInRange =
-            (bookingDateTime.isAtSameMomentAs(start) ||
-                bookingDateTime.isAfter(start)) &&
+            _isDateTimeAfterStart(bookingDateTime, start, _isFirstReport) &&
             (bookingDateTime.isAtSameMomentAs(end) ||
                 bookingDateTime.isBefore(end));
       }
 
+      final isExitedStatus = _isBookingExited(b);
+
       bool isExitedInRange = false;
-      if (exitDateTime != null && b.status.trim().toUpperCase() != 'PARKED') {
+      if (isExitedStatus && exitDateTime != null) {
         isExitedInRange =
-            (exitDateTime.isAtSameMomentAs(start) ||
-                exitDateTime.isAfter(start)) &&
+            _isDateTimeAfterStart(exitDateTime, start, _isFirstReport) &&
             (exitDateTime.isAtSameMomentAs(end) || exitDateTime.isBefore(end));
       }
 
-      final sts = b.sts.trim().toLowerCase();
-      final isPassOrSub =
-          isSubscriptionSts(sts) ||
-          RegExp(r'^\d+(?:hr|h)$', caseSensitive: false).hasMatch(sts);
+      final isPassOrSub = isPassOrSubscriptionSts(b.sts, b.bookType);
 
-      // Passes/subscriptions are paid upfront upon booking
+      // Passes (12, 24/Full Day, 48, 72) and Subscriptions (Weekly, 15-day, Monthly)
+      // are paid upfront upon booking -> include in summary report when booked in range!
       if (isPassOrSub) {
         return isBookedInRange;
       }
 
-      // Hourly / Instant parking is paid on exit; only include in summary after exit
-      return isExitedInRange;
+      // Purely Hourly / Instant parking (no pass) is paid upon exit:
+      // DO NOT add count and amount when booked / parked.
+      // ONLY add count and amount after vehicle has exited within range.
+      return isExitedStatus && isExitedInRange;
     }).toList();
   }
 
@@ -493,14 +592,11 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
     final s = (b.totalamout.trim().isNotEmpty ? b.totalamout : b.amount).trim();
     final baseAmount = double.tryParse(s) ?? 0.0;
 
-    final sts = b.sts.trim().toLowerCase();
-    final isPassOrSub =
-        isSubscriptionSts(sts) ||
-        RegExp(r'^\d+(?:hr|h)$', caseSensitive: false).hasMatch(sts);
+    final isPassOrSub = isPassOrSubscriptionSts(b.sts, b.bookType);
 
-    // If it is a purely hourly/instant booking and hasn't been completed yet,
-    // the amount hasn't been collected. Wait for exit.
-    if (!isPassOrSub && b.status.trim().toUpperCase() == 'PARKED') {
+    // Purely Hourly / Instant bookings (no pass): strictly collected upon exit.
+    // While booked / parked (not exited), amount must be 0.0.
+    if (!isPassOrSub && !_isBookingExited(b)) {
       return 0.0;
     }
 
@@ -515,55 +611,72 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
 
     if (_isFirstReport) {
       start = DateTime(start.year, start.month, start.day, 0, 0, 0);
-      end = DateTime(end.year, end.month, end.day, 23, 59, 59);
+      end = DateTime(end.year, end.month, end.day, 23, 59, 59, 999);
+    } else {
+      final now = DateTime.now();
+      if (end.isBefore(now)) {
+        end = now.add(const Duration(minutes: 5));
+      }
     }
 
     final totals = _SummaryTotals();
     for (final b in list) {
-      final bookingDateTime = _combineDateTime(b.bookingDate, b.bookingTime);
-      final exitDateTime =
-          (b.exitvehicledate.trim().isNotEmpty &&
-                  b.exitvehicletime.trim().isNotEmpty)
-              ? _combineDateTime(b.exitvehicledate, b.exitvehicletime)
-              : null;
+      final bookingDateTime = _combineDateTime(
+        b.bookingDate.isNotEmpty ? b.bookingDate : (b.parkeddate.isNotEmpty ? b.parkeddate : b.parkingDate),
+        b.bookingTime.isNotEmpty ? b.bookingTime : (b.parkedtime.isNotEmpty ? b.parkedtime : b.parkingTime),
+      );
+      final exitDateTime = _combineDateTime(
+        b.exitvehicledate,
+        b.exitvehicletime,
+      ) ?? bookingDateTime;
 
       bool isBookedInRange = false;
       if (bookingDateTime != null) {
         isBookedInRange =
-            (bookingDateTime.isAtSameMomentAs(start) ||
-                bookingDateTime.isAfter(start)) &&
+            _isDateTimeAfterStart(bookingDateTime, start, _isFirstReport) &&
             (bookingDateTime.isAtSameMomentAs(end) ||
                 bookingDateTime.isBefore(end));
       }
 
+      final isExitedStatus = _isBookingExited(b);
+
       bool isExitedInRange = false;
-      if (exitDateTime != null && b.status.trim().toUpperCase() != 'PARKED') {
+      if (isExitedStatus && exitDateTime != null) {
         isExitedInRange =
-            (exitDateTime.isAtSameMomentAs(start) ||
-                exitDateTime.isAfter(start)) &&
+            _isDateTimeAfterStart(exitDateTime, start, _isFirstReport) &&
             (exitDateTime.isAtSameMomentAs(end) || exitDateTime.isBefore(end));
       }
 
-      final sts = b.sts.trim().toLowerCase();
-      final isPassOrSub =
-          isSubscriptionSts(sts) ||
-          RegExp(r'^\d+(?:hr|h)$', caseSensitive: false).hasMatch(sts);
+      final isPassOrSub = isPassOrSubscriptionSts(b.sts, b.bookType);
 
-      // Prevent double counting across shifts:
-      // Passes are paid upfront; only include in totals if booked during this report's range.
+      // Passes and Subscriptions are paid upfront; only include in totals if booked during this report's range.
       if (isPassOrSub && !isBookedInRange) {
         continue;
       }
 
-      // Hourly is paid on exit; only include count and amount after vehicle has exited
-      if (!isPassOrSub && !isExitedInRange) {
+      // Purely Hourly / Instant parking (no pass): do NOT add count and amount when booked.
+      // Only include count and amount after vehicle has exited within range.
+      if (!isPassOrSub && (!isExitedStatus || !isExitedInRange)) {
         continue;
       }
 
       final amount = _amountForBooking(b);
+      final sts = b.sts.trim().toLowerCase();
 
-      if (RegExp(r'^\d+(?:hr|h)$', caseSensitive: false).hasMatch(sts)) {
-        final hours = int.tryParse(sts.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      if (RegExp(r'^\d+(?:hr|h)?$', caseSensitive: false).hasMatch(sts) ||
+          sts == 'fullday' ||
+          sts == 'full day' ||
+          b.bookType.trim().toLowerCase() == '24 hours' ||
+          b.bookType.trim().toLowerCase() == '24hours') {
+        int hours = 0;
+        if (sts == 'fullday' ||
+            sts == 'full day' ||
+            b.bookType.trim().toLowerCase() == '24 hours' ||
+            b.bookType.trim().toLowerCase() == '24hours') {
+          hours = 24;
+        } else {
+          hours = int.tryParse(sts.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+        }
         totals.addPassHours(hours, amount);
       } else if (sts == 'weekly' || sts == '7day' || sts == '7days') {
         totals.weeklyCount++;
@@ -701,18 +814,6 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
       }
     }
 
-    final entryCount = list.length;
-    final exitCount =
-        list
-            .where(
-              (b) =>
-                  b.exitvehicledate.trim().isNotEmpty &&
-                  b.status.trim().toUpperCase() != 'PARKED',
-            )
-            .length;
-
-    final reportDate = DateFormat('dd-MM-yyyy').format(now);
-    final reportTime = DateFormat('hh:mm a').format(now);
     final startDate = _selectedStartDate ?? _defaultStartDate;
     final endDate = now;
 
@@ -722,6 +823,28 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
         _isFirstReport
             ? DateTime(startDate.year, startDate.month, startDate.day, 0, 0, 0)
             : startDate;
+
+    final entryCount =
+        _bookings.where((b) {
+          if (b.Vendorid != widget.vendorid) return false;
+          final dt = _combineDateTime(b.bookingDate, b.bookingTime);
+          if (dt == null) return false;
+          return _isDateTimeAfterStart(dt, printedStartDate, _isFirstReport) &&
+              (dt.isAtSameMomentAs(endDate) || dt.isBefore(endDate));
+        }).length;
+
+    final exitCount =
+        _bookings.where((b) {
+          if (b.Vendorid != widget.vendorid) return false;
+          if (!_isBookingExited(b)) return false;
+          final dt = _combineDateTime(b.exitvehicledate, b.exitvehicletime);
+          if (dt == null) return false;
+          return _isDateTimeAfterStart(dt, printedStartDate, _isFirstReport) &&
+              (dt.isAtSameMomentAs(endDate) || dt.isBefore(endDate));
+        }).length;
+
+    final reportDate = DateFormat('dd-MM-yyyy').format(now);
+    final reportTime = DateFormat('hh:mm a').format(now);
 
     final startLabel = DateFormat(
       'dd-MM-yyyy hh:mm a',
@@ -738,13 +861,17 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
       empId: empId,
     );
 
+    final reportBoundaryTime =
+        DateTime(now.year, now.month, now.day, now.hour, now.minute);
+
     if (mounted) {
       setState(() {
         _isFirstReport = false;
-        _lastReportEndTime = now;
-        _selectedStartDate = now;
-        _selectedEndDate = now;
-        final formatted = DateFormat('dd-MM-yyyy hh:mm a').format(now);
+        _lastReportEndTime = reportBoundaryTime;
+        _selectedStartDate = reportBoundaryTime;
+        _selectedEndDate = reportBoundaryTime;
+        final formatted =
+            DateFormat('dd-MM-yyyy hh:mm a').format(reportBoundaryTime);
         _startDateController.text = formatted;
         _endDateController.text = formatted;
       });

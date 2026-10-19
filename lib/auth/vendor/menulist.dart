@@ -17,6 +17,8 @@ import 'package:mywheels/auth/vendor/vendorsupport.dart';
 import 'package:http/http.dart' as http;
 import 'package:mywheels/config/authconfig.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mywheels/auth/vendor/vendorsearch.dart';
+import 'package:mywheels/services/local_db_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../config/colorcode.dart';
 import 'bookings.dart';
@@ -151,6 +153,13 @@ class _menuPageState extends State<listmenu> {
 
                               // Clear SharedPreferences
                               await prefs.clear();
+
+                              // Clear RAM caches
+                              GlobalVendorDashCache.clear();
+                              GlobalRecentExits.exitedBookingIds.clear();
+                              globalSelectedPaymentModes.clear();
+                              GlobalVendorSearchCache.allVendors = null;
+                              GlobalVendorSearchCache.vendorId = null;
 
                               if (context.mounted) {
                                 Navigator.pushAndRemoveUntil(

@@ -18,8 +18,84 @@ import 'Fogot password.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import 'package:fluttertoast/fluttertoast.dart';
 import 'customerregister.dart';
 
+String _extractErrorMessage(String responseBody, {int? statusCode}) {
+  try {
+    final decoded = json.decode(responseBody);
+    if (decoded is Map) {
+      if (decoded['message'] != null && decoded['message'].toString().trim().isNotEmpty) {
+        return decoded['message'].toString().trim();
+      }
+      if (decoded['error'] != null && decoded['error'].toString().trim().isNotEmpty) {
+        return decoded['error'].toString().trim();
+      }
+      if (decoded['msg'] != null && decoded['msg'].toString().trim().isNotEmpty) {
+        return decoded['msg'].toString().trim();
+      }
+    }
+  } catch (_) {}
+
+  final trimmed = responseBody.trim();
+  if (trimmed.isNotEmpty && !trimmed.startsWith('<') && trimmed.length < 200) {
+    return trimmed;
+  }
+  if (statusCode == 401) {
+    return 'Incorrect password';
+  }
+  return 'Login failed. Please try again.';
+}
+
+void _showToast(BuildContext context, String message) {
+  try {
+    final fToast = FToast().init(context);
+    fToast.removeCustomToast();
+    fToast.showToast(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 10.0),
+        decoration: BoxDecoration(
+          color: const Color(0xDD3A3A3A),
+          borderRadius: BorderRadius.circular(25.0),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 6.0,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          message,
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontSize: 14.0,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ),
+      positionedToastBuilder: (context, child, gravity) {
+        return Positioned(
+          bottom: 110.0,
+          left: 20.0,
+          right: 20.0,
+          child: Center(child: child),
+        );
+      },
+      toastDuration: const Duration(seconds: 2),
+    );
+  } catch (e) {
+    Fluttertoast.cancel();
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: const Color(0xCC333333),
+      textColor: Colors.white,
+      fontSize: 14.0,
+    );
+  }
+}
 
 class splashlogin extends StatefulWidget {
   const splashlogin({super.key});
@@ -194,6 +270,8 @@ class _CustomerRegisterFormState extends State<CustomerRegisterForm> {
   bool _isLoading = false;
   bool _isPasswordVisible = false;
   Future<void> login(BuildContext context) async {
+    FocusScope.of(context).unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
     String mobileNumber = _amobileNumberController.text.trim();
     String password = _apasswordController.text.trim();
 
@@ -254,25 +332,11 @@ class _CustomerRegisterFormState extends State<CustomerRegisterForm> {
           );
         }
       } else {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text('Login Status: ${response.statusCode}'),
-            content: Text(response.body),
-            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('OK'))],
-          )
-        );
+        _showToast(context, _extractErrorMessage(response.body, statusCode: response.statusCode));
       }
     } catch (error) {
       print('[LOGIN] API call failed: $error');
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('Login Exception'),
-          content: Text(error.toString()),
-          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('OK'))],
-        )
-      );
+      _showToast(context, 'Login error. Please try again.');
     } finally {
       setState(() {
         _isLoading = false;
@@ -329,6 +393,11 @@ class _CustomerRegisterFormState extends State<CustomerRegisterForm> {
                     inputFormatter: const [],
                     label: 'Password',
                     hint: 'Please enter your password',
+                    onSubmitted: (value) {
+                      FocusScope.of(context).unfocus();
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      login(context);
+                    },
                     suffix: IconButton(
                       icon: Icon(
                         _isPasswordVisible ? Icons.visibility : Icons.visibility_off,size: 14,
@@ -354,6 +423,8 @@ class _CustomerRegisterFormState extends State<CustomerRegisterForm> {
                     : GestureDetector(
                   onTap: () {
                     // Call the login function when the icon is tapped
+                    FocusScope.of(context).unfocus();
+                    FocusManager.instance.primaryFocus?.unfocus();
                     login(context);
                   },
                   child: Container(
@@ -496,6 +567,8 @@ class _VendorRegisterFormState extends State<VendorRegisterForm> {
   bool _isLoading = false; // Define the _isLoading variable
   bool _isPasswordVisible = false;
   Future<void> vendorlogin(BuildContext context) async {
+    FocusScope.of(context).unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
     String mobileNumber = _vendormobileController.text.trim();
     String password = _passwordController.text.trim();
 
@@ -605,25 +678,11 @@ class _VendorRegisterFormState extends State<VendorRegisterForm> {
           );
         }
       } else {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text('Login Status: ${loginResponse.statusCode}'),
-            content: Text(loginResponse.body),
-            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('OK'))],
-          )
-        );
+        _showToast(context, _extractErrorMessage(loginResponse.body, statusCode: loginResponse.statusCode));
       }
     } catch (error) {
       print('[LOGIN] API call failed: $error');
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('Login Exception'),
-          content: Text(error.toString()),
-          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('OK'))],
-        )
-      );
+      _showToast(context, 'Login error. Please try again.');
     } finally {
       setState(() {
         _isLoading = false;
@@ -674,7 +733,7 @@ class _VendorRegisterFormState extends State<VendorRegisterForm> {
                     keyboard: TextInputType.text,
                     obscure: !_isPasswordVisible,
                     // obscure: true,
-                    textInputAction: TextInputAction.next,
+                    textInputAction: TextInputAction.done,
                     inputFormatter: const [],
                     label: 'Password',
                     suffix: IconButton(
@@ -687,7 +746,11 @@ class _VendorRegisterFormState extends State<VendorRegisterForm> {
                         });
                       },
                     ),
-                    onSubmitted: (value) {},
+                    onSubmitted: (value) {
+                      FocusScope.of(context).unfocus();
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      vendorlogin(context);
+                    },
                     hint: 'Please enter your Password',
                   ),
                 ),
@@ -704,6 +767,8 @@ class _VendorRegisterFormState extends State<VendorRegisterForm> {
                     : GestureDetector(
                   onTap: () {
                     // Call the login function when the icon is tapped
+                    FocusScope.of(context).unfocus();
+                    FocusManager.instance.primaryFocus?.unfocus();
                     vendorlogin(context);
                   },
                   child: Container(

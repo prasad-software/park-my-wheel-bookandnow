@@ -70,3 +70,10 @@
 # Keep all printer service implementations
 -keep class * implements android.print.PrintService { *; }
 -keep class * extends android.print.PrintService { *; }
+
+# ========== Google ML Kit Text Recognition ==========
+-keep class com.google.mlkit.** { *; }
+-keep class com.google_mlkit_text_recognition.** { *; }
+-dontwarn com.google.mlkit.vision.text.**
+-dontwarn com.google.mlkit.**
+-dontwarn com.google_mlkit_text_recognition.**

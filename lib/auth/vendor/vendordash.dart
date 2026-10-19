@@ -19,6 +19,7 @@ import 'package:mywheels/auth/vendor/vendorbottomnav/vendorprofile.dart';
 import 'package:mywheels/auth/vendor/vendorcreatebooking.dart';
 import 'package:mywheels/auth/vendor/vendornotificationpage.dart';
 import 'package:mywheels/auth/vendor/vendorsearch.dart';
+import 'package:mywheels/auth/vendor/booking_ticket_dialog.dart';
 import 'package:mywheels/auth/vendor/vendorsubscriptionapply.dart';
 import 'package:mywheels/config/authconfig.dart';
 import 'package:mywheels/config/colorcode.dart';
@@ -46,12 +47,23 @@ import 'menusscreen.dart';
 Map<String, String> globalSelectedPaymentModes = {};
 
 class GlobalVendorDashCache {
+  static String? currentVendorId;
   static List<Bookingdata>? carsOnParking;
   static List<Bookingdata>? carsCompleted;
   static List<Bookingdata>? bikesOnParking;
   static List<Bookingdata>? bikesCompleted;
   static List<Bookingdata>? othersOnParking;
   static List<Bookingdata>? othersCompleted;
+
+  static void clear() {
+    currentVendorId = null;
+    carsOnParking = null;
+    carsCompleted = null;
+    bikesOnParking = null;
+    bikesCompleted = null;
+    othersOnParking = null;
+    othersCompleted = null;
+  }
 }
 
 class vendordashScreen extends StatefulWidget {
@@ -90,6 +102,10 @@ class _HomeScreenState extends State<vendordashScreen>
   @override
   void initState() {
     super.initState();
+    if (GlobalVendorDashCache.currentVendorId != widget.vendorid) {
+      GlobalVendorDashCache.clear();
+      GlobalVendorDashCache.currentVendorId = widget.vendorid;
+    }
     _requestNotificationPermission();
     _tabController = TabController(
       length: 3,
@@ -1870,6 +1886,10 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
     });
 
     // Try to load from cache first for instant display
+    if (GlobalVendorDashCache.currentVendorId != widget.vendorid) {
+      GlobalVendorDashCache.clear();
+      GlobalVendorDashCache.currentVendorId = widget.vendorid;
+    }
     if (GlobalVendorDashCache.carsOnParking != null) {
       bookingDataNotifier.value = GlobalVendorDashCache.carsOnParking!;
       isLoading = false;
@@ -1887,11 +1907,13 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
             });
             updatePayableTimes();
           }
+          GlobalVendorDashCache.currentVendorId = widget.vendorid;
           GlobalVendorDashCache.carsOnParking = data;
         })
         .catchError((error) {
           if (mounted) {
             setState(() {
+              bookingDataNotifier.value = [];
               isLoading = false;
             });
           }
@@ -2031,7 +2053,17 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
       LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
-      return data.map((item) => Bookingdata.fromJson(item)).toList();
+      return data
+          .map((item) => Bookingdata.fromJson(item))
+          .where(
+            (b) =>
+                !GlobalRecentExits.exitedBookingIds.contains(b.id) &&
+                (b.exitvehicledate == null ||
+                    b.exitvehicledate!.trim().isEmpty ||
+                    b.exitvehicledate == 'null') &&
+                b.status.toUpperCase() != 'COMPLETED',
+          )
+          .toList();
     } else if (response.statusCode == 404 || response.statusCode == 400) {
       throw 'No booking found';
     } else {
@@ -2069,7 +2101,17 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
       LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
-      return data.map((item) => Bookingdata.fromJson(item)).toList();
+      return data
+          .map((item) => Bookingdata.fromJson(item))
+          .where(
+            (b) =>
+                !GlobalRecentExits.exitedBookingIds.contains(b.id) &&
+                (b.exitvehicledate == null ||
+                    b.exitvehicledate!.trim().isEmpty ||
+                    b.exitvehicledate == 'null') &&
+                b.status.toUpperCase() != 'COMPLETED',
+          )
+          .toList();
     } else if (response.statusCode == 404 || response.statusCode == 400) {
       throw 'No booking found';
     } else {
@@ -2107,7 +2149,17 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
       LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
-      return data.map((item) => Bookingdata.fromJson(item)).toList();
+      return data
+          .map((item) => Bookingdata.fromJson(item))
+          .where(
+            (b) =>
+                !GlobalRecentExits.exitedBookingIds.contains(b.id) &&
+                (b.exitvehicledate == null ||
+                    b.exitvehicledate!.trim().isEmpty ||
+                    b.exitvehicledate == 'null') &&
+                b.status.toUpperCase() != 'COMPLETED',
+          )
+          .toList();
     } else if (response.statusCode == 404 || response.statusCode == 400) {
       throw 'No booking found';
     } else {
@@ -2218,6 +2270,19 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
                   final filteredData =
                       bookingData.where((booking) {
                         try {
+                          if (GlobalRecentExits.exitedBookingIds.contains(
+                            booking.id,
+                          )) {
+                            return false;
+                          }
+                          final exitDate =
+                              (booking.exitvehicledate ?? '').trim();
+                          if (exitDate.isNotEmpty && exitDate != 'null') {
+                            return false;
+                          }
+                          if (booking.status.toUpperCase() == 'COMPLETED') {
+                            return false;
+                          }
                           return isVendorShortParkingSts(
                             booking.sts?.toString(),
                           );
@@ -2266,6 +2331,16 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
                                 (v) => v.id == vehicle.id,
                               );
                               bookingDataNotifier.value = currentData;
+                              GlobalRecentExits.exitedBookingIds.add(
+                                vehicle.id,
+                              );
+                              GlobalVendorDashCache.carsOnParking?.removeWhere(
+                                (v) => v.id == vehicle.id,
+                              );
+                              GlobalVendorDashCache.carsCompleted = null;
+                              LocalDbService.markBookingCompletedOffline(
+                                vehicle.id,
+                              );
                               setState(
                                 () {},
                               ); // Rebuild to refresh the Completed tab
@@ -2482,6 +2557,10 @@ class _BikesTabState extends State<BikesTab>
       });
     });
     // Try to load from cache first for instant display
+    if (GlobalVendorDashCache.currentVendorId != widget.vendorid) {
+      GlobalVendorDashCache.clear();
+      GlobalVendorDashCache.currentVendorId = widget.vendorid;
+    }
     if (GlobalVendorDashCache.bikesOnParking != null) {
       bookingDataNotifier.value = GlobalVendorDashCache.bikesOnParking!;
       updatePayableTimes();
@@ -2495,10 +2574,16 @@ class _BikesTabState extends State<BikesTab>
             });
             updatePayableTimes(); // Call update once data is fetched
           }
+          GlobalVendorDashCache.currentVendorId = widget.vendorid;
           GlobalVendorDashCache.bikesOnParking = data;
         })
         .catchError((error) {
-          // Do nothing on error for bikes tab
+          if (mounted) {
+            setState(() {
+              bookingDataNotifier.value = [];
+            });
+          }
+          print('Error fetching bikes data: $error');
         });
     fetchInitialData();
   }
@@ -2614,7 +2699,17 @@ class _BikesTabState extends State<BikesTab>
       LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
-      return data.map((item) => Bookingdata.fromJson(item)).toList();
+      return data
+          .map((item) => Bookingdata.fromJson(item))
+          .where(
+            (b) =>
+                !GlobalRecentExits.exitedBookingIds.contains(b.id) &&
+                (b.exitvehicledate == null ||
+                    b.exitvehicledate!.trim().isEmpty ||
+                    b.exitvehicledate == 'null') &&
+                b.status.toUpperCase() != 'COMPLETED',
+          )
+          .toList();
     } else if (response.statusCode == 404 || response.statusCode == 400) {
       throw 'No booking found';
     } else {
@@ -2652,7 +2747,17 @@ class _BikesTabState extends State<BikesTab>
       LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
-      return data.map((item) => Bookingdata.fromJson(item)).toList();
+      return data
+          .map((item) => Bookingdata.fromJson(item))
+          .where(
+            (b) =>
+                !GlobalRecentExits.exitedBookingIds.contains(b.id) &&
+                (b.exitvehicledate == null ||
+                    b.exitvehicledate!.trim().isEmpty ||
+                    b.exitvehicledate == 'null') &&
+                b.status.toUpperCase() != 'COMPLETED',
+          )
+          .toList();
     } else if (response.statusCode == 404 || response.statusCode == 400) {
       throw 'No booking found';
     } else {
@@ -2690,7 +2795,17 @@ class _BikesTabState extends State<BikesTab>
       LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
-      return data.map((item) => Bookingdata.fromJson(item)).toList();
+      return data
+          .map((item) => Bookingdata.fromJson(item))
+          .where(
+            (b) =>
+                !GlobalRecentExits.exitedBookingIds.contains(b.id) &&
+                (b.exitvehicledate == null ||
+                    b.exitvehicledate!.trim().isEmpty ||
+                    b.exitvehicledate == 'null') &&
+                b.status.toUpperCase() != 'COMPLETED',
+          )
+          .toList();
     } else if (response.statusCode == 404 || response.statusCode == 400) {
       throw 'No booking found';
     } else {
@@ -2801,6 +2916,19 @@ class _BikesTabState extends State<BikesTab>
                   final filteredData =
                       bookingData.where((booking) {
                         try {
+                          if (GlobalRecentExits.exitedBookingIds.contains(
+                            booking.id,
+                          )) {
+                            return false;
+                          }
+                          final exitDate =
+                              (booking.exitvehicledate ?? '').trim();
+                          if (exitDate.isNotEmpty && exitDate != 'null') {
+                            return false;
+                          }
+                          if (booking.status.toUpperCase() == 'COMPLETED') {
+                            return false;
+                          }
                           return isVendorShortParkingSts(
                             booking.sts?.toString(),
                           );
@@ -2849,6 +2977,16 @@ class _BikesTabState extends State<BikesTab>
                                 (v) => v.id == vehicle.id,
                               );
                               bookingDataNotifier.value = currentData;
+                              GlobalRecentExits.exitedBookingIds.add(
+                                vehicle.id,
+                              );
+                              GlobalVendorDashCache.bikesOnParking?.removeWhere(
+                                (v) => v.id == vehicle.id,
+                              );
+                              GlobalVendorDashCache.bikesCompleted = null;
+                              LocalDbService.markBookingCompletedOffline(
+                                vehicle.id,
+                              );
                               setState(
                                 () {},
                               ); // Rebuild to refresh the Completed tab
@@ -3094,6 +3232,10 @@ class _OthersTabState extends State<OthersTab>
       });
     });
     // Try to load from cache first for instant display
+    if (GlobalVendorDashCache.currentVendorId != widget.vendorid) {
+      GlobalVendorDashCache.clear();
+      GlobalVendorDashCache.currentVendorId = widget.vendorid;
+    }
     if (GlobalVendorDashCache.othersOnParking != null) {
       bookingDataNotifier.value = GlobalVendorDashCache.othersOnParking!;
       isLoading = false;
@@ -3109,14 +3251,17 @@ class _OthersTabState extends State<OthersTab>
             });
             updatePayableTimes(); // Call update once data is fetched
           }
+          GlobalVendorDashCache.currentVendorId = widget.vendorid;
           GlobalVendorDashCache.othersOnParking = data;
         })
         .catchError((error) {
           if (mounted) {
             setState(() {
+              bookingDataNotifier.value = [];
               isLoading = false;
             });
           }
+          print('Error fetching others data: $error');
         });
     fetchInitialData();
   }
@@ -3234,7 +3379,17 @@ class _OthersTabState extends State<OthersTab>
       LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
-      return data.map((item) => Bookingdata.fromJson(item)).toList();
+      return data
+          .map((item) => Bookingdata.fromJson(item))
+          .where(
+            (b) =>
+                !GlobalRecentExits.exitedBookingIds.contains(b.id) &&
+                (b.exitvehicledate == null ||
+                    b.exitvehicledate!.trim().isEmpty ||
+                    b.exitvehicledate == 'null') &&
+                b.status.toUpperCase() != 'COMPLETED',
+          )
+          .toList();
     } else if (response.statusCode == 400) {
       throw 'No booking found';
     } else {
@@ -3272,7 +3427,17 @@ class _OthersTabState extends State<OthersTab>
       LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
-      return data.map((item) => Bookingdata.fromJson(item)).toList();
+      return data
+          .map((item) => Bookingdata.fromJson(item))
+          .where(
+            (b) =>
+                !GlobalRecentExits.exitedBookingIds.contains(b.id) &&
+                (b.exitvehicledate == null ||
+                    b.exitvehicledate!.trim().isEmpty ||
+                    b.exitvehicledate == 'null') &&
+                b.status.toUpperCase() != 'COMPLETED',
+          )
+          .toList();
     } else if (response.statusCode == 404 || response.statusCode == 400) {
       throw 'No booking found';
     } else {
@@ -3310,7 +3475,17 @@ class _OthersTabState extends State<OthersTab>
       LocalDbService.cacheApiResponse(urlStr, jsonResponse);
       final List<dynamic>? data = jsonResponse['bookings'];
       if (data == null || data.isEmpty) throw 'No bookings available';
-      return data.map((item) => Bookingdata.fromJson(item)).toList();
+      return data
+          .map((item) => Bookingdata.fromJson(item))
+          .where(
+            (b) =>
+                !GlobalRecentExits.exitedBookingIds.contains(b.id) &&
+                (b.exitvehicledate == null ||
+                    b.exitvehicledate!.trim().isEmpty ||
+                    b.exitvehicledate == 'null') &&
+                b.status.toUpperCase() != 'COMPLETED',
+          )
+          .toList();
     } else if (response.statusCode == 404 || response.statusCode == 400) {
       throw 'No booking found';
     } else {
@@ -3426,6 +3601,19 @@ class _OthersTabState extends State<OthersTab>
                   final filteredData =
                       bookingData.where((booking) {
                         try {
+                          if (GlobalRecentExits.exitedBookingIds.contains(
+                            booking.id,
+                          )) {
+                            return false;
+                          }
+                          final exitDate =
+                              (booking.exitvehicledate ?? '').trim();
+                          if (exitDate.isNotEmpty && exitDate != 'null') {
+                            return false;
+                          }
+                          if (booking.status.toUpperCase() == 'COMPLETED') {
+                            return false;
+                          }
                           return isVendorShortParkingSts(
                             booking.sts?.toString(),
                           );
@@ -3477,6 +3665,15 @@ class _OthersTabState extends State<OthersTab>
                                 (v) => v.id == vehicle.id,
                               );
                               bookingDataNotifier.value = currentData;
+                              GlobalRecentExits.exitedBookingIds.add(
+                                vehicle.id,
+                              );
+                              GlobalVendorDashCache.othersOnParking
+                                  ?.removeWhere((v) => v.id == vehicle.id);
+                              GlobalVendorDashCache.othersCompleted = null;
+                              LocalDbService.markBookingCompletedOffline(
+                                vehicle.id,
+                              );
                               setState(
                                 () {},
                               ); // Rebuild to refresh the Completed tab
@@ -3963,6 +4160,9 @@ class UniversalPrintHelper {
     }
 
     if (_isBuiltinPrinterType(cached)) {
+      if (cached == 'pinelabs_builtin') {
+        return 'pinelabs_builtin';
+      }
       if (_sunmiBoundAndInited) return 'sunmi';
       if (await _bindAndInitSunmi()) {
         _rememberPrinter('sunmi');
@@ -4364,15 +4564,16 @@ class UniversalPrintHelper {
       }
     }
 
+    // Try Sunmi first on POS devices (instant AIDL binding ~10ms vs PineLabs timeout)
+    if (await _tryBindSunmiPrinter(maxRetries: fast ? 1 : 2)) {
+      _rememberPrinter('sunmi');
+      return 'sunmi';
+    }
+
     final pineLabsType = await PineLabsPrintHelper.detectPineLabsPrinter();
     if (pineLabsType == 'pinelabs_builtin') {
       _rememberPrinter('pinelabs_builtin');
       return 'pinelabs_builtin';
-    }
-
-    if (await _tryBindSunmiPrinter(maxRetries: fast ? 1 : 2)) {
-      _rememberPrinter('sunmi');
-      return 'sunmi';
     }
 
     print('=== Printer detection (Bluetooth) ===');
@@ -5949,10 +6150,11 @@ class cardashleft extends StatelessWidget {
                                                         sts: vehicle.sts,
                                                         cartype:
                                                             vehicle.Cartype,
-                                                        vendorid:
-                                                            vehicle.Vendorid,
+                                                        vendorid: vendorId,
                                                         bookType:
                                                             vehicle.bookType,
+                                                        onExitSuccess:
+                                                            onExitSuccess,
                                                       ),
                                                     );
                                                   },
@@ -6014,32 +6216,46 @@ class cardashleft extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.only(
-                              left: 12.0,
-                              right: 15.0,
-                              top: 6.0,
-                              bottom: 6.0,
-                            ), // Optional: Adds space inside the container
-                            decoration: BoxDecoration(
-                              color:
-                                  vehicle.status == 'Cancelled'
-                                      ? Colors.red
-                                      : ColorUtils.primarycolor(),
-                              borderRadius: const BorderRadius.only(
-                                topRight: Radius.circular(20.0),
-                                bottomRight: Radius.circular(20.0),
-                              ),
+                          InkWell(
+                            onTap: () {
+                              BookingTicketDialog.showForBooking(
+                                context,
+                                vehicle,
+                                vendorId: vendorId,
+                                defaultVendorName: defaultVendorName,
+                              );
+                            },
+                            borderRadius: const BorderRadius.only(
+                              topRight: Radius.circular(20.0),
+                              bottomRight: Radius.circular(20.0),
                             ),
-                            child: Icon(
-                              vehicle.vehicletype == "Car"
-                                  ? Icons.directions_car
-                                  : vehicle.vehicletype == "Bike"
-                                  ? Icons.motorcycle
-                                  : Icons
-                                      .directions_transit, // Replace with any icon for "Others"
-                              size: 20,
-                              color: Colors.white,
+                            child: Container(
+                              padding: const EdgeInsets.only(
+                                left: 12.0,
+                                right: 15.0,
+                                top: 6.0,
+                                bottom: 6.0,
+                              ), // Optional: Adds space inside the container
+                              decoration: BoxDecoration(
+                                color:
+                                    vehicle.status == 'Cancelled'
+                                        ? Colors.red
+                                        : ColorUtils.primarycolor(),
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(20.0),
+                                  bottomRight: Radius.circular(20.0),
+                                ),
+                              ),
+                              child: Icon(
+                                vehicle.vehicletype == "Car"
+                                    ? Icons.directions_car
+                                    : vehicle.vehicletype == "Bike"
+                                    ? Icons.motorcycle
+                                    : Icons
+                                        .directions_transit, // Replace with any icon for "Others"
+                                size: 20,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 0),
@@ -6739,10 +6955,11 @@ class bikedashleft extends StatelessWidget {
                                                         sts: vehicle.sts,
                                                         cartype:
                                                             vehicle.Cartype,
-                                                        vendorid:
-                                                            vehicle.Vendorid,
+                                                        vendorid: vendorId,
                                                         bookType:
                                                             vehicle.bookType,
+                                                        onExitSuccess:
+                                                            onExitSuccess,
                                                       ),
                                                     );
                                                   },
@@ -6804,32 +7021,46 @@ class bikedashleft extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.only(
-                              left: 12.0,
-                              right: 15.0,
-                              top: 6.0,
-                              bottom: 6.0,
-                            ), // Optional: Adds space inside the container
-                            decoration: BoxDecoration(
-                              color:
-                                  vehicle.status == 'Cancelled'
-                                      ? Colors.red
-                                      : ColorUtils.primarycolor(),
-                              borderRadius: const BorderRadius.only(
-                                topRight: Radius.circular(20.0),
-                                bottomRight: Radius.circular(20.0),
-                              ),
+                          InkWell(
+                            onTap: () {
+                              BookingTicketDialog.showForBooking(
+                                context,
+                                vehicle,
+                                vendorId: vendorId,
+                                defaultVendorName: defaultVendorName,
+                              );
+                            },
+                            borderRadius: const BorderRadius.only(
+                              topRight: Radius.circular(20.0),
+                              bottomRight: Radius.circular(20.0),
                             ),
-                            child: Icon(
-                              vehicle.vehicletype == "Car"
-                                  ? Icons.directions_car
-                                  : vehicle.vehicletype == "Bike"
-                                  ? Icons.motorcycle
-                                  : Icons
-                                      .directions_transit, // Replace with any icon for "Others"
-                              size: 20,
-                              color: Colors.white,
+                            child: Container(
+                              padding: const EdgeInsets.only(
+                                left: 12.0,
+                                right: 15.0,
+                                top: 6.0,
+                                bottom: 6.0,
+                              ), // Optional: Adds space inside the container
+                              decoration: BoxDecoration(
+                                color:
+                                    vehicle.status == 'Cancelled'
+                                        ? Colors.red
+                                        : ColorUtils.primarycolor(),
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(20.0),
+                                  bottomRight: Radius.circular(20.0),
+                                ),
+                              ),
+                              child: Icon(
+                                vehicle.vehicletype == "Car"
+                                    ? Icons.directions_car
+                                    : vehicle.vehicletype == "Bike"
+                                    ? Icons.motorcycle
+                                    : Icons
+                                        .directions_transit, // Replace with any icon for "Others"
+                                size: 20,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 0),
@@ -7529,10 +7760,11 @@ class othersdashleft extends StatelessWidget {
                                                         sts: vehicle.sts,
                                                         cartype:
                                                             vehicle.Cartype,
-                                                        vendorid:
-                                                            vehicle.Vendorid,
+                                                        vendorid: vendorId,
                                                         bookType:
                                                             vehicle.bookType,
+                                                        onExitSuccess:
+                                                            onExitSuccess,
                                                       ),
                                                     );
                                                   },
@@ -7594,32 +7826,46 @@ class othersdashleft extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.only(
-                              left: 12.0,
-                              right: 15.0,
-                              top: 6.0,
-                              bottom: 6.0,
-                            ), // Optional: Adds space inside the container
-                            decoration: BoxDecoration(
-                              color:
-                                  vehicle.status == 'Cancelled'
-                                      ? Colors.red
-                                      : ColorUtils.primarycolor(),
-                              borderRadius: const BorderRadius.only(
-                                topRight: Radius.circular(20.0),
-                                bottomRight: Radius.circular(20.0),
-                              ),
+                          InkWell(
+                            onTap: () {
+                              BookingTicketDialog.showForBooking(
+                                context,
+                                vehicle,
+                                vendorId: vendorId,
+                                defaultVendorName: defaultVendorName,
+                              );
+                            },
+                            borderRadius: const BorderRadius.only(
+                              topRight: Radius.circular(20.0),
+                              bottomRight: Radius.circular(20.0),
                             ),
-                            child: Icon(
-                              vehicle.vehicletype == "Car"
-                                  ? Icons.directions_car
-                                  : vehicle.vehicletype == "Bike"
-                                  ? Icons.motorcycle
-                                  : Icons
-                                      .directions_transit, // Replace with any icon for "Others"
-                              size: 20,
-                              color: Colors.white,
+                            child: Container(
+                              padding: const EdgeInsets.only(
+                                left: 12.0,
+                                right: 15.0,
+                                top: 6.0,
+                                bottom: 6.0,
+                              ), // Optional: Adds space inside the container
+                              decoration: BoxDecoration(
+                                color:
+                                    vehicle.status == 'Cancelled'
+                                        ? Colors.red
+                                        : ColorUtils.primarycolor(),
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(20.0),
+                                  bottomRight: Radius.circular(20.0),
+                                ),
+                              ),
+                              child: Icon(
+                                vehicle.vehicletype == "Car"
+                                    ? Icons.directions_car
+                                    : vehicle.vehicletype == "Bike"
+                                    ? Icons.motorcycle
+                                    : Icons
+                                        .directions_transit, // Replace with any icon for "Others"
+                                size: 20,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 0),
@@ -7940,7 +8186,7 @@ class vendordashright extends StatelessWidget {
                   otp: vehicle.otp,
                   vehiclenumber: vehicle.vehicleNumber,
                   vendorname: vehicle.vendorname,
-                  vendorid: vehicle.Vendorid,
+                  vendorid: vendorId,
                   parkingdate: vehicle.parkingDate,
                   parkingtime: vehicle.parkingTime,
                   bookedid: vehicle.id,
@@ -8330,34 +8576,48 @@ class vendordashright extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.only(
-                              left: 12.0,
-                              right: 15.0,
-                              top: 6.0,
-                              bottom: 6.0,
-                            ), // Optional: Adds space inside the container
-                            decoration: BoxDecoration(
-                              color:
-                                  vehicle.status == 'Cancelled'
-                                      ? Colors.red
-                                      : ColorUtils.primarycolor(),
-                              borderRadius: const BorderRadius.only(
-                                topRight: Radius.circular(20.0),
-                                bottomRight: Radius.circular(20.0),
-                              ),
+                          InkWell(
+                            onTap: () {
+                              BookingTicketDialog.showForBooking(
+                                context,
+                                vehicle,
+                                vendorId: vendorId,
+                                defaultVendorName: defaultVendorName,
+                              );
+                            },
+                            borderRadius: const BorderRadius.only(
+                              topRight: Radius.circular(20.0),
+                              bottomRight: Radius.circular(20.0),
                             ),
-                            child: Icon(
-                              vehicle.vehicletype == "Car"
-                                  ? Icons
-                                      .directions_car // Car icon
-                                  : vehicle.vehicletype == "Bike"
-                                  ? Icons
-                                      .directions_bike // Bike icon
-                                  : Icons
-                                      .directions_transit, // Default for Others
-                              size: 20,
-                              color: Colors.white,
+                            child: Container(
+                              padding: const EdgeInsets.only(
+                                left: 12.0,
+                                right: 15.0,
+                                top: 6.0,
+                                bottom: 6.0,
+                              ), // Optional: Adds space inside the container
+                              decoration: BoxDecoration(
+                                color:
+                                    vehicle.status == 'Cancelled'
+                                        ? Colors.red
+                                        : ColorUtils.primarycolor(),
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(20.0),
+                                  bottomRight: Radius.circular(20.0),
+                                ),
+                              ),
+                              child: Icon(
+                                vehicle.vehicletype == "Car"
+                                    ? Icons
+                                        .directions_car // Car icon
+                                    : vehicle.vehicletype == "Bike"
+                                    ? Icons
+                                        .directions_bike // Bike icon
+                                    : Icons
+                                        .directions_transit, // Default for Others
+                                size: 20,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 0),
@@ -8640,8 +8900,26 @@ class Bookingdata {
       subscriptiontype: json['subsctiptiontype'] ?? '',
       payableDuration: Duration.zero,
       bookType: json['bookType'] ?? "",
-      exitvehicledate: json['exitvehicledate'] ?? '',
-      exitvehicletime: json['exitvehicletime'] ?? '',
+      exitvehicledate: () {
+        final raw =
+            (json['exitvehicledate'] ??
+                    json['exitdate'] ??
+                    json['exitDate'] ??
+                    '')
+                .toString()
+                .trim();
+        return (raw.isEmpty || raw.toLowerCase() == 'null') ? '' : raw;
+      }(),
+      exitvehicletime: () {
+        final raw =
+            (json['exitvehicletime'] ??
+                    json['exittime'] ??
+                    json['exitTime'] ??
+                    '')
+                .toString()
+                .trim();
+        return (raw.isEmpty || raw.toLowerCase() == 'null') ? '' : raw;
+      }(),
       isValet: json['isValet'] == true || json['isValet'] == 'true',
       valetCharge: json['valetCharge']?.toString() ?? "0",
       subscriptionenddate: json['subsctiptionenddate'] ?? '',
@@ -8810,6 +9088,20 @@ class DashQuickExitHelper {
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
+        GlobalRecentExits.exitedBookingIds.add(bookingId);
+        GlobalVendorDashCache.carsOnParking?.removeWhere(
+          (v) => v.id == bookingId,
+        );
+        GlobalVendorDashCache.bikesOnParking?.removeWhere(
+          (v) => v.id == bookingId,
+        );
+        GlobalVendorDashCache.othersOnParking?.removeWhere(
+          (v) => v.id == bookingId,
+        );
+        GlobalVendorDashCache.carsCompleted = null;
+        GlobalVendorDashCache.bikesCompleted = null;
+        GlobalVendorDashCache.othersCompleted = null;
+        await LocalDbService.markBookingCompletedOffline(bookingId);
         GlobalVendorSearchCache.allVendors = [];
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -8841,6 +9133,19 @@ class DashQuickExitHelper {
           ),
           paymentMode: paymentMode,
         );
+        GlobalRecentExits.exitedBookingIds.add(bookingId);
+        GlobalVendorDashCache.carsOnParking?.removeWhere(
+          (v) => v.id == bookingId,
+        );
+        GlobalVendorDashCache.bikesOnParking?.removeWhere(
+          (v) => v.id == bookingId,
+        );
+        GlobalVendorDashCache.othersOnParking?.removeWhere(
+          (v) => v.id == bookingId,
+        );
+        GlobalVendorDashCache.carsCompleted = null;
+        GlobalVendorDashCache.bikesCompleted = null;
+        GlobalVendorDashCache.othersCompleted = null;
         GlobalVendorSearchCache.allVendors = [];
 
         if (context.mounted) {

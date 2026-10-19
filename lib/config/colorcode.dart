@@ -73,12 +73,21 @@ class AppColors {
 
 class UpperCaseTextFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    // Convert the new value to uppercase
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     final newText = newValue.text.toUpperCase();
-    return TextEditingValue(
+    return newValue.copyWith(
       text: newText,
-      selection: TextSelection.collapsed(offset: newText.length), // Move cursor to the end
+      selection: newValue.selection.isValid
+          ? newValue.selection.copyWith(
+              baseOffset:
+                  newValue.selection.baseOffset.clamp(0, newText.length),
+              extentOffset:
+                  newValue.selection.extentOffset.clamp(0, newText.length),
+            )
+          : newValue.selection,
     );
   }
 }

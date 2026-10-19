@@ -16,6 +16,7 @@ import 'package:tab_container/tab_container.dart';
 import 'package:mywheels/auth/vendor/vendorcreatebooking.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:mywheels/services/local_db_service.dart';
+import 'package:mywheels/auth/vendor/booking_ticket_dialog.dart';
 import 'package:mywheels/utils/vehicle_image_widget.dart';
 
 class GlobalVendorSearchCache {
@@ -134,37 +135,46 @@ class _vSearchScreenState extends State<vSearchScreen>
                         bookingtypetemporary: vehicle['status'] ?? '',
                         sts: vehicle['sts'] ?? '',
                         cartype: vehicle['carType'] ?? '',
-                        vendorid: vehicle['vendorId'] ?? widget.vendorid,
+                        vendorid: widget.vendorid,
                         bookType: vehicle['bookType'] ?? 'Hourly',
                         onExitSuccess: () {
                           GlobalRecentExits.exitedBookingIds.add(bookingId);
+                          GlobalVendorDashCache.carsOnParking?.removeWhere((v) => v.id == bookingId);
+                          GlobalVendorDashCache.bikesOnParking?.removeWhere((v) => v.id == bookingId);
+                          GlobalVendorDashCache.othersOnParking?.removeWhere((v) => v.id == bookingId);
+                          GlobalVendorDashCache.carsCompleted = null;
+                          GlobalVendorDashCache.bikesCompleted = null;
+                          GlobalVendorDashCache.othersCompleted = null;
+                          LocalDbService.markBookingCompletedOffline(bookingId);
+
                           final now = DateTime.now();
                           final formattedDate = DateFormat(
                             'dd-MM-yyyy',
                           ).format(now);
-                          setState(() {
-                            for (var v in allVendors) {
-                              if ((v['_id']?.toString() ??
-                                      v['id']?.toString() ??
-                                      '') ==
-                                  bookingId) {
-                                v['status'] = 'COMPLETED';
-                                v['exitvehicledate'] = formattedDate;
-                                v['exitvehicletime'] = DateFormat(
-                                  'HH:mm',
-                                ).format(now);
-                                break;
+                          if (mounted) {
+                            setState(() {
+                              for (var v in allVendors) {
+                                if ((v['_id']?.toString() ??
+                                        v['id']?.toString() ??
+                                        '') ==
+                                    bookingId) {
+                                  v['status'] = 'COMPLETED';
+                                  v['exitvehicledate'] = formattedDate;
+                                  v['exitvehicletime'] = DateFormat(
+                                    'HH:mm',
+                                  ).format(now);
+                                  break;
+                                }
                               }
-                            }
-                            // Remove from current filtered list (since we are on 'On Parking' tab)
-                            filteredVendors.removeWhere(
-                              (v) =>
-                                  (v['_id']?.toString() ??
-                                      v['id']?.toString() ??
-                                      '') ==
-                                  bookingId,
-                            );
-                          });
+                              filteredVendors.removeWhere(
+                                (v) =>
+                                    (v['_id']?.toString() ??
+                                        v['id']?.toString() ??
+                                        '') ==
+                                    bookingId,
+                              );
+                            });
+                          }
                           // Still fetch to ensure consistency, but UI is already updated
                           fetchVendors(showLoading: false);
                         },
@@ -188,7 +198,6 @@ class _vSearchScreenState extends State<vSearchScreen>
     if (GlobalVendorSearchCache.vendorId == widget.vendorid &&
         GlobalVendorSearchCache.allVendors != null) {
       allVendors = List.from(GlobalVendorSearchCache.allVendors!);
-      filteredVendors = List.from(allVendors);
       isLoading = false;
     }
 
@@ -220,32 +229,20 @@ class _vSearchScreenState extends State<vSearchScreen>
   void updatePayableTimes() {
     if (!mounted) return;
 
-    print(
-      'updatePayableTimes: Updating payable times for ${filteredVendors.length} vehicles',
-    );
     setState(() {
-      filteredVendors =
-          filteredVendors.map((vehicle) {
-            if (vehicle['status'] == 'PARKED' ||
-                vehicle['status'] == 'parked') {
-              try {
-                final parkedDateTime = _parseDateTime(
-                  vehicle['parkedDate'] ?? vehicle['parkingDate'],
-                  vehicle['parkedTime'] ?? vehicle['parkingTime'],
-                );
-                final elapsed = DateTime.now().difference(parkedDateTime);
-                vehicle['payableDuration'] = elapsed;
-                print(
-                  'updatePayableTimes: Vehicle ${vehicle['vehicleNumber']} duration: $elapsed',
-                );
-              } catch (e) {
-                print(
-                  'updatePayableTimes: Error calculating payable time for ${vehicle['vehicleNumber']}: $e',
-                );
-              }
-            }
-            return vehicle;
-          }).toList();
+      for (var vehicle in allVendors) {
+        if (vehicle['status'] == 'PARKED' ||
+            vehicle['status'] == 'parked') {
+          try {
+            final parkedDateTime = _parseDateTime(
+              vehicle['parkedDate'] ?? vehicle['parkingDate'],
+              vehicle['parkedTime'] ?? vehicle['parkingTime'],
+            );
+            final elapsed = DateTime.now().difference(parkedDateTime);
+            vehicle['payableDuration'] = elapsed;
+          } catch (_) {}
+        }
+      }
     });
   }
 
@@ -491,10 +488,6 @@ class _vSearchScreenState extends State<vSearchScreen>
       if (mounted) {
         setState(() {
           allVendors = combinedList;
-          // Only reset filteredVendors if we are not actively searching
-          if (searchController.text.isEmpty) {
-            filteredVendors = List.from(allVendors);
-          }
           isLoading = false;
           hasError = false;
         });
@@ -621,9 +614,17 @@ class _vSearchScreenState extends State<vSearchScreen>
         currentAmount = vehicle['amount']?.toString() ?? '0';
       }
 
+      GlobalRecentExits.exitedBookingIds.add(bookingId);
+      GlobalVendorDashCache.carsOnParking?.removeWhere((v) => v.id == bookingId);
+      GlobalVendorDashCache.bikesOnParking?.removeWhere((v) => v.id == bookingId);
+      GlobalVendorDashCache.othersOnParking?.removeWhere((v) => v.id == bookingId);
+      GlobalVendorDashCache.carsCompleted = null;
+      GlobalVendorDashCache.bikesCompleted = null;
+      GlobalVendorDashCache.othersCompleted = null;
+      await LocalDbService.markBookingCompletedOffline(bookingId);
+
       if (mounted) {
         setState(() {
-          GlobalRecentExits.exitedBookingIds.add(bookingId);
           // Optimistically update to COMPLETED instead of removing entirely
           final now = DateTime.now();
           final formattedDate = DateFormat('dd-MM-yyyy').format(now);
@@ -639,7 +640,6 @@ class _vSearchScreenState extends State<vSearchScreen>
             }
           }
 
-          // Remove from current filtered list (since we are on 'On Parking' tab)
           filteredVendors.removeWhere(
             (v) =>
                 (v['_id']?.toString() ?? v['id']?.toString() ?? '') ==
@@ -872,52 +872,65 @@ class _vSearchScreenState extends State<vSearchScreen>
     }
   }
 
+  List<Map<String, dynamic>> _getFilteredListForTab(int tabIndex, String query) {
+    final lowerQuery = query.trim().toLowerCase();
+    return allVendors.where((v) {
+      final bId = v['_id']?.toString() ?? v['id']?.toString() ?? '';
+      final status = v['status']?.toString().toUpperCase() ?? '';
+      final vehicleNumber = v['vehicleNumber']?.toString().toLowerCase() ?? '';
+      final exitDate = (v['exitvehicledate'] ?? '').toString().trim();
+      final hasExitDate = exitDate.isNotEmpty && exitDate != 'null';
+      final isRecentlyExited = GlobalRecentExits.exitedBookingIds.contains(bId);
+
+      if (tabIndex == 0) {
+        // --- ON PARKING TAB ---
+        // Exited vehicles CAN NEVER be on parking
+        if (isRecentlyExited || hasExitDate) {
+          return false;
+        }
+
+        if (status == 'COMPLETED') {
+          // Dashboard consistency: Weekly/monthly subscription passes stay until pass end date
+          if (!_subscriptionPassStillActive(v)) {
+            return false;
+          }
+        } else {
+          bool isParked = (status == 'PARKED' ||
+              status == 'BOOKED' ||
+              v['status'].toString().toLowerCase() == 'parked');
+          if (!isParked) return false;
+        }
+      } else {
+        // --- COMPLETED TAB ---
+        if (_subscriptionPassStillActive(v)) {
+          return false;
+        }
+
+        bool isFinished = (status == 'COMPLETED') || isRecentlyExited || hasExitDate;
+        if (!isFinished) return false;
+
+        // Strictly only show today's completed bookings
+        final today = DateFormat('dd-MM-yyyy').format(DateTime.now());
+        if (hasExitDate && !_isSameDay(exitDate, today)) {
+          return false;
+        }
+      }
+
+      // Search Query Filtering
+      if (lowerQuery.isNotEmpty && !vehicleNumber.contains(lowerQuery)) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+  }
+
   void filterVendors(String query) {
-    print('filterVendors: Filtering query: $query, tab: $_selectedTabIndex');
-    setState(() {
-      filteredVendors =
-          allVendors.where((v) {
-            final status = v['status']?.toString().toUpperCase() ?? '';
-            final vehicleNumber =
-                v['vehicleNumber']?.toString().toLowerCase() ?? '';
-
-            // Tab Filtering
-            if (_selectedTabIndex == 0) {
-              // On Parking Tab: Show PARKED or BOOKED status
-              bool isParked =
-                  (status == 'PARKED' ||
-                      status == 'BOOKED' ||
-                      v['status'].toString().toLowerCase() == 'parked');
-
-              // Dashboard consistency: Weekly/monthly from machinecreatebooking use COMPLETED; keep on list until pass end date.
-              if (status == 'COMPLETED' && _subscriptionPassStillActive(v)) {
-                isParked = true;
-              }
-
-              if (!isParked) return false;
-            } else if (_selectedTabIndex == 1) {
-              // Completed Tab: Show strictly COMPLETED status
-              bool isFinished = (status == 'COMPLETED');
-
-              // If it's an active subscription, it belongs in "On Parking", not here.
-              if (isFinished && _subscriptionPassStillActive(v)) {
-                isFinished = false;
-              }
-
-              if (!isFinished) return false;
-
-              // Dashboard consistency: Strictly only show today's completed bookings, even when searching
-              final today = DateFormat('dd-MM-yyyy').format(DateTime.now());
-              final exitDate = v['exitvehicledate']?.toString() ?? '';
-
-              if (!_isSameDay(exitDate, today)) return false;
-            }
-
-            // Search Query Filtering
-            return vehicleNumber.contains(query.toLowerCase());
-          }).toList();
-      print('filterVendors: Results: ${filteredVendors.length}');
-    });
+    if (mounted) {
+      setState(() {
+        filteredVendors = _getFilteredListForTab(_selectedTabIndex, query);
+      });
+    }
   }
 
   String _formatDuration(Duration duration) {
@@ -1152,8 +1165,8 @@ class _vSearchScreenState extends State<vSearchScreen>
                   ),
                   tabs: const [Text('On Parking'), Text('Completed')],
                   children: [
-                    Container(color: Colors.white, child: _buildBookingList()),
-                    Container(color: Colors.white, child: _buildBookingList()),
+                    Container(color: Colors.white, child: _buildBookingList(0)),
+                    Container(color: Colors.white, child: _buildBookingList(1)),
                   ],
                 ),
               ),
@@ -1164,10 +1177,11 @@ class _vSearchScreenState extends State<vSearchScreen>
     );
   }
 
-  Widget _buildBookingList() {
+  Widget _buildBookingList(int tabIndex) {
     if (isLoading) {
       return const SizedBox.shrink();
     }
+    final list = _getFilteredListForTab(tabIndex, searchController.text);
     return hasError
         ? Center(
           child: Column(
@@ -1182,10 +1196,10 @@ class _vSearchScreenState extends State<vSearchScreen>
             ],
           ),
         )
-        : filteredVendors.isEmpty
+        : list.isEmpty
         ? Center(
           child: Text(
-            _selectedTabIndex == 0
+            tabIndex == 0
                 ? 'No Active Parked Vehicles Found'
                 : 'No Completed Bookings Found',
             style: GoogleFonts.poppins(),
@@ -1193,16 +1207,16 @@ class _vSearchScreenState extends State<vSearchScreen>
         )
         : ListView.separated(
           padding: const EdgeInsets.only(top: 15),
-          itemCount: filteredVendors.length,
+          itemCount: list.length,
           separatorBuilder:
               (context, index) =>
-                  SizedBox(height: _selectedTabIndex == 1 ? 10 : 8),
+                  SizedBox(height: tabIndex == 1 ? 10 : 8),
           itemBuilder: (context, index) {
-            final vehicle = filteredVendors[index];
+            final vehicle = list[index];
             final String rowBookingId =
                 vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? '';
 
-            if (_selectedTabIndex == 1) {
+            if (tabIndex == 1) {
               final bookingData = Bookingdata.fromJson(vehicle);
               return vendordashright(
                 vehicle: bookingData,
@@ -1235,12 +1249,13 @@ class _vSearchScreenState extends State<vSearchScreen>
                 isSubscriptionSts(vehicle['subsctiptiontype']?.toString());
             final remainingDaysMessage =
                 isSubscription ? getRemainingDaysMessage(vehicle) : '';
-            final List<String> vehicleImages = (vehicle['vehicleImages'] is List)
-                ? (vehicle['vehicleImages'] as List)
-                    .map((e) => e.toString().trim())
-                    .where((s) => s.isNotEmpty)
-                    .toList()
-                : (vehicle['vehicleImage'] != null &&
+            final List<String> vehicleImages =
+                (vehicle['vehicleImages'] is List)
+                    ? (vehicle['vehicleImages'] as List)
+                        .map((e) => e.toString().trim())
+                        .where((s) => s.isNotEmpty)
+                        .toList()
+                    : (vehicle['vehicleImage'] != null &&
                         vehicle['vehicleImage'].toString().trim().isNotEmpty)
                     ? [vehicle['vehicleImage'].toString().trim()]
                     : const [];
@@ -2207,30 +2222,43 @@ class _vSearchScreenState extends State<vSearchScreen>
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.only(
-                                      left: 12.0,
-                                      right: 15.0,
-                                      top: 6.0,
-                                      bottom: 6.0,
+                                  InkWell(
+                                    onTap: () {
+                                      BookingTicketDialog.showForMap(
+                                        context,
+                                        vehicle,
+                                        vendorId: widget.vendorid,
+                                      );
+                                    },
+                                    borderRadius: const BorderRadius.only(
+                                      topRight: Radius.circular(20.0),
+                                      bottomRight: Radius.circular(20.0),
                                     ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          vehicle['status']
-                                                      .toString()
-                                                      .toLowerCase() ==
-                                                  'cancelled'
-                                              ? Colors.red
-                                              : ColorUtils.primarycolor(),
-                                      borderRadius: const BorderRadius.only(
-                                        topRight: Radius.circular(20.0),
-                                        bottomRight: Radius.circular(20.0),
+                                    child: Container(
+                                      padding: const EdgeInsets.only(
+                                        left: 12.0,
+                                        right: 15.0,
+                                        top: 6.0,
+                                        bottom: 6.0,
                                       ),
-                                    ),
-                                    child: Icon(
-                                      _getVehicleIcon(vehicle['vehicleType']),
-                                      size: 20,
-                                      color: Colors.white,
+                                      decoration: BoxDecoration(
+                                        color:
+                                            vehicle['status']
+                                                        .toString()
+                                                        .toLowerCase() ==
+                                                    'cancelled'
+                                                ? Colors.red
+                                                : ColorUtils.primarycolor(),
+                                        borderRadius: const BorderRadius.only(
+                                          topRight: Radius.circular(20.0),
+                                          bottomRight: Radius.circular(20.0),
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        _getVehicleIcon(vehicle['vehicleType']),
+                                        size: 20,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 10),
@@ -2513,7 +2541,8 @@ class _vSearchScreenState extends State<vSearchScreen>
                                   VehicleImageThumbnail(
                                     images: vehicleImages,
                                     vehicleNumber:
-                                        vehicle['vehicleNumber']?.toString() ?? '',
+                                        vehicle['vehicleNumber']?.toString() ??
+                                        '',
                                   ),
                                 ],
                               ),

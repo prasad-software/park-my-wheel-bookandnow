@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mywheels/services/local_db_service.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -1233,11 +1234,17 @@ class _ExitpageState extends State<Exitpage> {
             (Route<dynamic> route) => false,
           );
         } else {
+          final prefs = await SharedPreferences.getInstance();
+          final activeVendorId =
+              prefs.getString('vendorId') ??
+              prefs.getString('vendorid') ??
+              widget.vendorid;
+
           nav.pushAndRemoveUntil(
             MaterialPageRoute(
               builder:
                   (context) => vendordashScreen(
-                    vendorid: widget.vendorid,
+                    vendorid: activeVendorId,
                     initialTabIndex: widget.currentTabIndex,
                   ),
             ),

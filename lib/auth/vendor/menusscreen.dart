@@ -15,6 +15,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../config/colorcode.dart';
 import 'bookings.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:mywheels/auth/vendor/vendorsearch.dart';
+import 'package:mywheels/services/local_db_service.dart';
 
 class menu extends StatefulWidget {
   final String vendorid;
@@ -273,6 +275,13 @@ class _menuPageState extends State<menu> {
 
                               // Clear SharedPreferences
                               await prefs.clear();
+
+                              // Clear RAM caches
+                              GlobalVendorDashCache.clear();
+                              GlobalRecentExits.exitedBookingIds.clear();
+                              globalSelectedPaymentModes.clear();
+                              GlobalVendorSearchCache.allVendors = null;
+                              GlobalVendorSearchCache.vendorId = null;
 
                               if (context.mounted) {
                                 Navigator.pushAndRemoveUntil(

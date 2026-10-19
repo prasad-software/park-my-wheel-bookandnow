@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mywheels/services/local_db_service.dart';
 import 'package:animated_toggle_switch/animated_toggle_switch.dart';
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
 import 'package:flutter/material.dart';
@@ -62,11 +63,11 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
   bool _isLoading = false;
 
   // Toggle states for Book, Print, Exit, Vehicle Upload, and Slot View
-  bool _bookEnabled = false;
-  bool _printEnabled = false;
-  bool _exitEnabled = false;
-  bool _vehicleUploadEnabled = false;
-  bool _slotViewEnabled = false;
+  bool _bookEnabled = true;
+  bool _printEnabled = true;
+  bool _exitEnabled = true;
+  bool _vehicleUploadEnabled = true;
+  bool _slotViewEnabled = true;
   bool _valetEnabled = false;
   bool _isPineLabsEnabled = false;
   bool _bookAndShowEnabled = true;
@@ -528,6 +529,18 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
     }
   }
 
+  bool _parseBool(dynamic value, {bool defaultValue = true}) {
+    if (value == null) return defaultValue;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final lower = value.trim().toLowerCase();
+      if (lower == 'true' || lower == '1') return true;
+      if (lower == 'false' || lower == '0') return false;
+    }
+    return defaultValue;
+  }
+
   // Fetch toggle states from backend
   Future<void> _fetchToggleStates() async {
     setState(() {
@@ -536,17 +549,31 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       final savedDefaultType = prefs.getString('defaultVehicleType_${widget.vendorid}');
       if (savedDefaultType != null) {
         _defaultVehicleType = savedDefaultType;
       }
-      
+
       final savedCharge = prefs.getString('valetCharge_${widget.vendorid}');
       if (savedCharge != null && savedCharge.trim().isNotEmpty) {
         _valetChargeController.text = savedCharge;
       } else {
         _valetChargeController.text = '0';
+      }
+
+      final localBookEnabled = prefs.getBool('bookEnabled_${widget.vendorid}');
+      final localPrintEnabled = prefs.getBool('printEnabled_${widget.vendorid}');
+      final localExitEnabled = prefs.getBool('exitEnabled_${widget.vendorid}');
+      final localBookAndShowEnabled = prefs.getBool('bookAndShowEnabled_${widget.vendorid}');
+
+      if (mounted) {
+        setState(() {
+          if (localBookEnabled != null) _bookEnabled = localBookEnabled;
+          if (localPrintEnabled != null) _printEnabled = localPrintEnabled;
+          if (localExitEnabled != null) _exitEnabled = localExitEnabled;
+          if (localBookAndShowEnabled != null) _bookAndShowEnabled = localBookAndShowEnabled;
+        });
       }
 
       final response = await http.get(
@@ -555,18 +582,31 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
+        final bookVal = _parseBool(data['bookEnabled'], defaultValue: localBookEnabled ?? true);
+        final printVal = _parseBool(data['printEnabled'], defaultValue: localPrintEnabled ?? true);
+        final exitVal = _parseBool(data['exitEnabled'], defaultValue: localExitEnabled ?? true);
+        final bookAndShowVal = _parseBool(data['bookAndShowEnabled'], defaultValue: localBookAndShowEnabled ?? true);
+        final vehicleUploadVal = _parseBool(data['vehicleUploadEnabled'], defaultValue: true);
+        final slotViewVal = _parseBool(data['slotViewEnabled'], defaultValue: true);
+        final valetVal = _parseBool(data['valetEnabled'], defaultValue: false);
+
         setState(() {
-          _bookEnabled = data['bookEnabled'] ?? false;
-          _printEnabled = data['printEnabled'] ?? false;
-          _exitEnabled = data['exitEnabled'] ?? false;
-          _vehicleUploadEnabled = data['vehicleUploadEnabled'] ?? false;
-          _slotViewEnabled = data['slotViewEnabled'] ?? false;
-          _valetEnabled = data['valetEnabled'] ?? false;
-          _bookAndShowEnabled = data['bookAndShowEnabled'] ?? true;
+          _bookEnabled = bookVal;
+          _printEnabled = printVal;
+          _exitEnabled = exitVal;
+          _vehicleUploadEnabled = vehicleUploadVal;
+          _slotViewEnabled = slotViewVal;
+          _valetEnabled = valetVal;
+          _bookAndShowEnabled = bookAndShowVal;
           if (data['valetCharge'] != null && savedCharge == null) {
             _valetChargeController.text = data['valetCharge'].toString();
           }
         });
+
+        await prefs.setBool('bookEnabled_${widget.vendorid}', bookVal);
+        await prefs.setBool('printEnabled_${widget.vendorid}', printVal);
+        await prefs.setBool('exitEnabled_${widget.vendorid}', exitVal);
+        await prefs.setBool('bookAndShowEnabled_${widget.vendorid}', bookAndShowVal);
       } else {
         // If API doesn't exist yet or returns error, use default values
         print('Failed to fetch toggle states: ${response.statusCode}');
@@ -584,19 +624,34 @@ class _ThirdState extends State<manageparkingarea>with TickerProviderStateMixin 
   // Save toggle states to backend
   Future<void> _saveToggleStates() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('bookEnabled_${widget.vendorid}', _bookEnabled);
+      await prefs.setBool('printEnabled_${widget.vendorid}', _printEnabled);
+      await prefs.setBool('exitEnabled_${widget.vendorid}', _exitEnabled);
+      await prefs.setBool('bookAndShowEnabled_${widget.vendorid}', _bookAndShowEnabled);
+
+      final toggleMap = {
+        'bookEnabled': _bookEnabled,
+        'printEnabled': _printEnabled,
+        'exitEnabled': _exitEnabled,
+        'vehicleUploadEnabled': _vehicleUploadEnabled,
+        'slotViewEnabled': _slotViewEnabled,
+        'valetEnabled': _valetEnabled,
+        'valetCharge': _valetChargeController.text,
+        'bookAndShowEnabled': _bookAndShowEnabled,
+      };
+
+      try {
+        LocalDbService.cacheApiResponse(
+          Uri.parse('${ApiConfig.baseUrl}vendor/get-toggle-states/${widget.vendorid}').toString(),
+          toggleMap,
+        );
+      } catch (_) {}
+
       final response = await http.put(
         Uri.parse('${ApiConfig.baseUrl}vendor/update-toggle-states/${widget.vendorid}'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'bookEnabled': _bookEnabled,
-          'printEnabled': _printEnabled,
-          'exitEnabled': _exitEnabled,
-          'vehicleUploadEnabled': _vehicleUploadEnabled,
-          'slotViewEnabled': _slotViewEnabled,
-          'valetEnabled': _valetEnabled,
-          'valetCharge': _valetChargeController.text,
-          'bookAndShowEnabled': _bookAndShowEnabled,
-        }),
+        body: json.encode(toggleMap),
       );
 
       if (response.statusCode == 200) {

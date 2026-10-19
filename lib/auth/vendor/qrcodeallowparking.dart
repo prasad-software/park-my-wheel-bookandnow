@@ -21,6 +21,7 @@ import 'package:mywheels/auth/vendor/vendordash.dart';
 import 'package:mywheels/auth/vendor/vendorbottomnav/thirdpage.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:mywheels/auth/vendor/booking_ticket_dialog.dart';
 
 import '../customer/dummypages/drawermyspace.dart' hide ParkingEntry;
 import '../customer/dummypages/myspaceeditslotchargesamenties.dart'
@@ -1510,20 +1511,34 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                                                 padding: const EdgeInsets.all(
                                                   5.0,
                                                 ),
-                                                child: Container(
-                                                  height: 40,
-                                                  width: 40,
-                                                  decoration: BoxDecoration(
-                                                    color:
-                                                        ColorUtils.primarycolor(),
-                                                    borderRadius:
-                                                        const BorderRadius.all(
-                                                          Radius.circular(20),
-                                                        ),
+                                                child: InkWell(
+                                                  onTap: () {
+                                                    if (bookingDetails != null) {
+                                                      BookingTicketDialog.showForMap(
+                                                        context,
+                                                        bookingDetails!,
+                                                        vendorId: widget.vendorid,
+                                                      );
+                                                    }
+                                                  },
+                                                  borderRadius: const BorderRadius.all(
+                                                    Radius.circular(20),
                                                   ),
-                                                  child: const Icon(
-                                                    Icons.directions_car,
-                                                    color: Colors.white,
+                                                  child: Container(
+                                                    height: 40,
+                                                    width: 40,
+                                                    decoration: BoxDecoration(
+                                                      color:
+                                                          ColorUtils.primarycolor(),
+                                                      borderRadius:
+                                                          const BorderRadius.all(
+                                                            Radius.circular(20),
+                                                          ),
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.directions_car,
+                                                      color: Colors.white,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
@@ -2552,8 +2567,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                     bookingtypetemporary: vehicle['status']?.toString() ?? '',
                     sts: vehicle['sts']?.toString() ?? '',
                     cartype: vehicle['carType']?.toString() ?? '',
-                    vendorid:
-                        vehicle['vendorId']?.toString() ?? widget.vendorid,
+                    vendorid: widget.vendorid,
                     bookType: vehicle['bookingType']?.toString() ?? '',
                     goToBookingOnExit: !widget.isFromNewBooking,
                     onExitSuccess:

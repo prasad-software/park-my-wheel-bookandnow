@@ -220,7 +220,12 @@ class _NextPageState extends State<NextPage> {
   }
   Future<void> _pickImage(ImageSource source, bool isIdProof) async {
     final ImagePicker picker = ImagePicker();
-    XFile? pickedFile = await picker.pickImage(source: source);
+    XFile? pickedFile = await picker.pickImage(
+      source: source,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
 
     if (pickedFile != null) {
       if (isIdProof) {

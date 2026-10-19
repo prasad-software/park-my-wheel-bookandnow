@@ -31,3 +31,32 @@ bool isFixedHourPassSts(String? sts) {
   if (sts == null) return false;
   return RegExp(r'^\d+(?:hr|h)$', caseSensitive: false).hasMatch(sts.toString().trim());
 }
+
+/// Fixed hour-pass (12, 24, 48, 72 hours / Full Day)
+bool isPassSts(String? sts, [String? bookType]) {
+  if (bookType != null) {
+    final bt = bookType.trim().toLowerCase();
+    if (bt == '24 hours' || bt == '24hours') return true;
+  }
+  if (sts == null) return false;
+  final s = sts.toString().trim().toLowerCase();
+  if (s == 'fullday' ||
+      s == 'full day' ||
+      s == '24 hours' ||
+      s == '24hours') {
+    return true;
+  }
+  final m = RegExp(r'^(\d+)(?:hr|h)?$', caseSensitive: false).firstMatch(s);
+  if (m != null) {
+    final hours = int.tryParse(m.group(1) ?? '') ?? 0;
+    if (hours == 12 || hours == 24 || hours == 48 || hours == 72) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// True when booking represents a fixed pass or subscription (paid upfront upon booking)
+bool isPassOrSubscriptionSts(String? sts, [String? bookType]) {
+  return isSubscriptionSts(sts) || isPassSts(sts, bookType);
+}
