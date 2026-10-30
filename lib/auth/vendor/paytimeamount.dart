@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+import 'package:mywheels/auth/vendor/booking_ticket_dialog.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -40,6 +42,7 @@ class Exitpage extends StatefulWidget {
   final bool isValet;
   final String valetCharge;
   final String? amount;
+  final double? maxCap;
   const Exitpage({
     super.key,
     required this.bookingid,
@@ -63,6 +66,7 @@ class Exitpage extends StatefulWidget {
     this.isValet = false,
     this.valetCharge = '0',
     this.amount,
+    this.maxCap,
   });
 
   @override
@@ -92,11 +96,26 @@ class _ExitpageState extends State<Exitpage> {
   String _paymentMode = 'Online';
   String? _vendorUpiId;
   String? _vendorName;
+  double maxCap = 0.0;
+
+  bool _isInstant() {
+    final sts = widget.sts.trim().toLowerCase();
+    final bType = widget.bookType.trim().toLowerCase();
+    final tempType = widget.bookingtypetemporary.trim().toLowerCase();
+    if (['subscription', 'weekly', '15day', 'monthly'].contains(tempType)) return false;
+    if (['subscription', 'weekly', '15day', 'monthly'].contains(sts)) return false;
+    if (RegExp(r'^\d+hr$', caseSensitive: false).hasMatch(sts)) return false;
+    if (['weekly', 'monthly', 'subscription', '12 hours', '24 hours', '48 hours', '72 hours', 'fullday', 'full day', 'pass'].contains(bType)) {
+      return false;
+    }
+    return true;
+  }
 
   @override
   void initState() {
     super.initState();
     _paymentMode = widget.paymentMode;
+    maxCap = widget.maxCap ?? 0.0;
     selectedDateTime = DateTime.now();
     _loadExitData();
   }
@@ -170,7 +189,31 @@ class _ExitpageState extends State<Exitpage> {
           valetCharge: data['valetCharge']?.toString() ?? "0",
         );
 
+        double fetchedCap = (data['maxCap'] as num?)?.toDouble() ?? 0.0;
+        if (fetchedCap == 0.0) {
+          final vType = widget.vehicletype.toLowerCase();
+          if (vType.contains('bike')) {
+            fetchedCap = double.tryParse(data['maxBikeAmount']?.toString() ?? '0') ?? 0.0;
+          } else if (vType.contains('car')) {
+            fetchedCap = double.tryParse(data['maxCarAmount']?.toString() ?? '0') ?? 0.0;
+          } else {
+            fetchedCap = double.tryParse(data['maxOthersAmount']?.toString() ?? '0') ?? 0.0;
+          }
+        }
+        if (fetchedCap == 0.0 && GlobalVendorDashCache.vendor != null) {
+          final v = GlobalVendorDashCache.vendor!;
+          final vType = widget.vehicletype.toLowerCase();
+          if (vType.contains('bike')) {
+            fetchedCap = v.maxBikeAmount;
+          } else if (vType.contains('car')) {
+            fetchedCap = v.maxCarAmount;
+          } else {
+            fetchedCap = v.maxOthersAmount;
+          }
+        }
+
         setState(() {
+          if (fetchedCap > 0) maxCap = fetchedCap;
           gstPercentage = (data['gstPercentage'] as num?)?.toDouble() ?? 0.0;
           handlingFee = (data['handlingFee'] as num?)?.toDouble() ?? 0.0;
           parkingCharges = charges;
@@ -198,6 +241,28 @@ class _ExitpageState extends State<Exitpage> {
         final chargesDataResponse = LocalDbService.getCachedApiResponse(
           '${ApiConfig.baseUrl}vendor/getchargesdata/${widget.vendorid}',
         );
+
+        if (maxCap == 0.0 && GlobalVendorDashCache.vendor != null) {
+          final v = GlobalVendorDashCache.vendor!;
+          final vType = widget.vehicletype.toLowerCase();
+          if (vType.contains('bike')) {
+            maxCap = v.maxBikeAmount;
+          } else if (vType.contains('car')) {
+            maxCap = v.maxCarAmount;
+          } else {
+            maxCap = v.maxOthersAmount;
+          }
+        } else if (maxCap == 0.0 && vendorDataResponse != null && vendorDataResponse['data'] != null) {
+          final vData = vendorDataResponse['data'];
+          final vType = widget.vehicletype.toLowerCase();
+          if (vType.contains('bike')) {
+            maxCap = double.tryParse(vData['maxBikeAmount']?.toString() ?? '0') ?? 0.0;
+          } else if (vType.contains('car')) {
+            maxCap = double.tryParse(vData['maxCarAmount']?.toString() ?? '0') ?? 0.0;
+          } else {
+            maxCap = double.tryParse(vData['maxOthersAmount']?.toString() ?? '0') ?? 0.0;
+          }
+        }
 
         if (vendorDataResponse != null && vendorDataResponse['data'] != null) {
           final vendorData = vendorDataResponse['data'];
@@ -591,6 +656,9 @@ class _ExitpageState extends State<Exitpage> {
     String? bookingBaseAmount,
   }) {
     if (payableAmountFromBackend > 0) {
+      if (maxCap > 0 && payableAmountFromBackend > maxCap && _isInstant()) {
+        return maxCap;
+      }
       return payableAmountFromBackend;
     }
 
@@ -622,10 +690,14 @@ class _ExitpageState extends State<Exitpage> {
     String bookingTypeLower = bookingType.toLowerCase();
 
     if (bookingTypeLower == 'hourly') {
-      return calculateHourly(
+      double rawAmt = calculateHourly(
         parkingCharges.map((e) => e.toJson()).toList(),
         duration,
       );
+      if (maxCap > 0 && rawAmt > maxCap && _isInstant()) {
+        return maxCap;
+      }
+      return rawAmt;
     } else if (bookingTypeLower == '24 hours' ||
         bookingTypeLower == 'weekly' ||
         bookingTypeLower == '12 hours' ||
@@ -1159,6 +1231,9 @@ class _ExitpageState extends State<Exitpage> {
     try {
       // Don't round parking charge - use original value
       double parkingCharge = payableAmount;
+      if (maxCap > 0 && parkingCharge > maxCap && _isInstant()) {
+        parkingCharge = maxCap;
+      }
 
       Map<String, dynamic> requestBody = {
         'amount': parkingCharge,
@@ -1220,6 +1295,43 @@ class _ExitpageState extends State<Exitpage> {
         print('Booking updated successfully');
         GlobalRecentExits.exitedBookingIds.add(bookingId);
 
+        final now = DateTime.now();
+        final exitDate = DateFormat('dd-MM-yyyy').format(now);
+        final exitTime = DateFormat('hh:mm a').format(now);
+        final String effectiveAmount =
+            requestBody['totalamout']?.toString() ??
+            requestBody['amount']?.toString() ??
+            payableAmount.toString();
+        final String effectiveInvoiceId =
+            bookingDataNotifier.value.isNotEmpty
+                ? (bookingDataNotifier.value.first.invoiceid ?? '')
+                : '';
+
+        if (mounted) {
+          await BookingTicketDialog.show(
+            context: context,
+            vendorName: _vendorName ?? '',
+            bookingId: bookingId,
+            invoiceId: effectiveInvoiceId.isNotEmpty ? effectiveInvoiceId : null,
+            vehicleType: widget.vehicletype,
+            vehicleNumber: widget.vehiclenumber,
+            parkingDate: widget.parkingdate,
+            parkingTime: widget.parkingtime,
+            amount: effectiveAmount,
+            personName: widget.username,
+            mobileNumber: widget.phoneno,
+            receiptSts: widget.sts,
+            appliedValetAmount: 0.0, // effectiveAmount already includes valet
+            instantParkingReceipt: _isInstant(),
+            vendorId: widget.vendorid,
+            bookType: widget.bookType,
+            isPrintAndExit: true,
+            exitDate: exitDate,
+            exitTime: exitTime,
+          );
+        }
+
+        if (!mounted) return;
         final nav = Navigator.of(context);
         nav.pop(); // Pop the bottom sheet
         if (widget.onExitSuccess != null) {
@@ -1864,6 +1976,9 @@ class _ExitpageState extends State<Exitpage> {
                             double valetAmt =
                                 double.tryParse(booking.valetCharge) ?? 0.0;
                             payableAmount += valetAmt;
+                            if (maxCap > 0 && payableAmount > maxCap && _isInstant()) {
+                              payableAmount = maxCap;
+                            }
                           }
 
                           return Text(
@@ -2066,6 +2181,9 @@ class _ExitpageState extends State<Exitpage> {
                                 booking.vehicletype.toLowerCase() == 'car') {
                               total +=
                                   double.tryParse(booking.valetCharge) ?? 0.0;
+                              if (maxCap > 0 && total > maxCap && _isInstant()) {
+                                total = maxCap;
+                              }
                             }
 
                             return Column(
@@ -2219,6 +2337,9 @@ class _ExitpageState extends State<Exitpage> {
                               booking.vehicletype.toLowerCase() == 'car') {
                             finalTotalForQr +=
                                 double.tryParse(booking.valetCharge) ?? 0.0;
+                            if (maxCap > 0 && finalTotalForQr > maxCap && _isInstant()) {
+                              finalTotalForQr = maxCap;
+                            }
                           }
 
                           return _buildInlineUpiQr(finalTotalForQr);
@@ -2286,6 +2407,15 @@ class _ExitpageState extends State<Exitpage> {
                                 sts: booking.sts,
                                 bookingBaseAmount: booking.amount,
                               );
+                              if (booking.isValet &&
+                                  booking.vehicletype.toLowerCase() == 'car') {
+                                double valetAmt =
+                                    double.tryParse(booking.valetCharge) ?? 0.0;
+                                payableAmount += valetAmt;
+                                if (maxCap > 0 && payableAmount > maxCap && _isInstant()) {
+                                  payableAmount = maxCap;
+                                }
+                              }
                               int hours = booking.payableDuration.inHours;
                               int minutes =
                                   booking.payableDuration.inMinutes % 60;

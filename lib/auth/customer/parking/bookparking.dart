@@ -2382,6 +2382,9 @@ class Vendor {
   double? distance;
   final List<ParkingEntry> parkingEntries;
   final bool visibility;
+  final double maxBikeAmount;
+  final double maxCarAmount;
+  final double maxOthersAmount;
 
   Vendor({
     required this.status,
@@ -2396,6 +2399,9 @@ class Vendor {
     required this.parkingEntries,
     this.distance,
     required this.visibility,
+    this.maxBikeAmount = 0.0,
+    this.maxCarAmount = 0.0,
+    this.maxOthersAmount = 0.0,
   });
 
   Vendor copyWith({
@@ -2411,6 +2417,9 @@ class Vendor {
     List<ParkingEntry>? parkingEntries,
     double? distance,
     bool? visibility,
+    double? maxBikeAmount,
+    double? maxCarAmount,
+    double? maxOthersAmount,
   }) {
     return Vendor(
       status: status ?? this.status,
@@ -2425,6 +2434,9 @@ class Vendor {
       parkingEntries: parkingEntries ?? this.parkingEntries,
       distance: distance ?? this.distance,
       visibility: visibility ?? this.visibility,
+      maxBikeAmount: maxBikeAmount ?? this.maxBikeAmount,
+      maxCarAmount: maxCarAmount ?? this.maxCarAmount,
+      maxOthersAmount: maxOthersAmount ?? this.maxOthersAmount,
     );
   }
 
@@ -2445,6 +2457,9 @@ class Vendor {
           .map((parkingEntryJson) => ParkingEntry.fromJson(parkingEntryJson))
           .toList(),
       visibility: json['visibility'] ?? false,
+      maxBikeAmount: double.tryParse(json['maxBikeAmount']?.toString() ?? '0') ?? 0.0,
+      maxCarAmount: double.tryParse(json['maxCarAmount']?.toString() ?? '0') ?? 0.0,
+      maxOthersAmount: double.tryParse(json['maxOthersAmount']?.toString() ?? '0') ?? 0.0,
     );
   }
 }

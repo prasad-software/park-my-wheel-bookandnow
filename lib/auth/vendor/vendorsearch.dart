@@ -614,6 +614,15 @@ class _vSearchScreenState extends State<vSearchScreen>
         currentAmount = vehicle['amount']?.toString() ?? '0';
       }
 
+      // Add valet charge if vehicle has valet
+      double baseAmt = double.tryParse(currentAmount.trim()) ?? 0.0;
+      final double valetAmt =
+          double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0;
+      final double finalTotal = baseAmt + valetAmt;
+      currentAmount = (finalTotal == finalTotal.roundToDouble())
+          ? finalTotal.round().toString()
+          : finalTotal.toStringAsFixed(2);
+
       GlobalRecentExits.exitedBookingIds.add(bookingId);
       GlobalVendorDashCache.carsOnParking?.removeWhere((v) => v.id == bookingId);
       GlobalVendorDashCache.bikesOnParking?.removeWhere((v) => v.id == bookingId);
@@ -692,14 +701,39 @@ class _vSearchScreenState extends State<vSearchScreen>
         }
       }
 
-      // Fire and forget the exit API call
-      _performQuickExit(
+      await _performQuickExit(
         vehicle,
         currentAmount,
         manageLoading: false,
-      ).catchError((e) {
-        print('Background Quick Exit failed for $bookingId: $e');
-      });
+      );
+
+      final now = DateTime.now();
+      final exitDate = DateFormat('dd-MM-yyyy').format(now);
+      final exitTime = DateFormat('hh:mm a').format(now);
+
+      if (mounted) {
+        await BookingTicketDialog.show(
+          context: context,
+          vendorName: vehicle['vendorName'] ?? '',
+          bookingId: bookingId,
+          invoiceId: vehicle['invoiceId'] ?? vehicle['invoiceid'],
+          vehicleType: vehicle['vehicleType'] ?? '',
+          vehicleNumber: vehicle['vehicleNumber'] ?? '',
+          parkingDate: vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '',
+          parkingTime: vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
+          amount: currentAmount,
+          personName: vehicle['personName'] ?? '',
+          mobileNumber: vehicle['mobileNumber'] ?? '',
+          receiptSts: vehicle['sts'] ?? '',
+          appliedValetAmount: 0.0, // currentAmount already includes valet
+          instantParkingReceipt: true,
+          vendorId: vehicle['vendorId'] ?? widget.vendorid,
+          bookType: vehicle['bookType'] ?? '',
+          isPrintAndExit: true,
+          exitDate: exitDate,
+          exitTime: exitTime,
+        );
+      }
     } catch (e) {
       print('Print & Exit: Error: $e');
       if (mounted) {

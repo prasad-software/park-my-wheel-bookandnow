@@ -2620,6 +2620,15 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         currentAmount = _getOfflineAmount(vehicle);
       }
 
+      // Add valet charge if vehicle has valet
+      double baseAmt = double.tryParse(currentAmount.trim()) ?? 0.0;
+      final double valetAmt =
+          double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0;
+      final double finalTotal = baseAmt + valetAmt;
+      currentAmount = (finalTotal == finalTotal.roundToDouble())
+          ? finalTotal.round().toString()
+          : finalTotal.toStringAsFixed(2);
+
       if (!mounted) return;
       try {
         await UniversalPrintHelper.printTicket(
@@ -2657,6 +2666,34 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       }
 
       await _performQuickExit(vehicle, currentAmount, manageLoading: false);
+
+      final now = DateTime.now();
+      final exitDate = DateFormat('dd-MM-yyyy').format(now);
+      final exitTime = DateFormat('hh:mm a').format(now);
+
+      if (mounted) {
+        await BookingTicketDialog.show(
+          context: context,
+          vendorName: vehicle['vendorName'] ?? '',
+          bookingId: vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? '',
+          invoiceId: vehicle['invoiceId'] ?? vehicle['invoiceid'],
+          vehicleType: vehicle['vehicleType'] ?? '',
+          vehicleNumber: vehicle['vehicleNumber'] ?? '',
+          parkingDate: vehicle['parkingDate'] ?? '',
+          parkingTime: vehicle['parkingTime'] ?? '',
+          amount: currentAmount,
+          personName: vehicle['userName'] ?? vehicle['personName'] ?? '',
+          mobileNumber: vehicle['mobileNumber'] ?? '',
+          receiptSts: vehicle['sts']?.toString(),
+          appliedValetAmount: 0.0, // currentAmount already includes valet
+          instantParkingReceipt: true,
+          vendorId: vehicle['vendorId']?.toString() ?? widget.vendorid,
+          bookType: vehicle['bookingType'] ?? vehicle['bookType'],
+          isPrintAndExit: true,
+          exitDate: exitDate,
+          exitTime: exitTime,
+        );
+      }
 
       if (mounted) {
         if (widget.isFromNewBooking) {

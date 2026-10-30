@@ -49,28 +49,41 @@ class BookingTicketDialog {
     String value, {
     Color? valueColor,
     bool isBold = false,
+    double labelFontSize = 12,
+    double valueFontSize = 12,
+    EdgeInsetsGeometry? padding,
   }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600),
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            value,
+    return Padding(
+      padding: padding ?? EdgeInsets.zero,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            label,
             style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-              color: valueColor ?? Colors.black87,
+              fontSize: labelFontSize,
+              fontWeight: isBold ? FontWeight.w600 : FontWeight.normal,
+              color: (isBold && labelFontSize > 12)
+                  ? Colors.black87
+                  : Colors.grey.shade600,
             ),
-            textAlign: TextAlign.right,
-            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: valueFontSize,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+                color: valueColor ?? Colors.black87,
+              ),
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -92,6 +105,9 @@ class BookingTicketDialog {
     List<String> vehicleImages = const [],
     String? vendorId,
     String? bookType,
+    bool isPrintAndExit = false,
+    String? exitDate,
+    String? exitTime,
   }) async {
     final String displayId =
         (invoiceId != null && invoiceId.trim().isNotEmpty)
@@ -100,11 +116,26 @@ class BookingTicketDialog {
 
     final String planLabel = resolvePlanLabel(receiptSts, null);
 
-    // final double baseAmt =
-    //     double.tryParse(amount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
-    // final double totalWithValet =
-    //     baseAmt + (appliedValetAmount > 0 ? appliedValetAmount : 0.0);
-    // final String cleanedTotalAmt = cleanAmount(totalWithValet.toString());
+    final double baseAmt =
+        double.tryParse(amount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+    // On Print and Exit, the passed amount is already the final calculated total
+    final double totalWithValet = isPrintAndExit
+        ? baseAmt
+        : (baseAmt + (appliedValetAmount > 0 ? appliedValetAmount : 0.0));
+    final String cleanedTotalAmt = cleanAmount(
+      totalWithValet > 0 ? totalWithValet.toString() : amount,
+    );
+    final String displayAmount =
+        (cleanedTotalAmt.isNotEmpty && cleanedTotalAmt != '0')
+            ? '₹$cleanedTotalAmt'
+            : (amount.trim().isNotEmpty && amount.trim() != '0'
+                ? (amount.startsWith('₹') ? amount : '₹$amount')
+                : 'Free');
+
+
+
+
+
 
     final IconData vehicleIcon = getVehicleIcon(vehicleType);
 
@@ -148,7 +179,9 @@ class BookingTicketDialog {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Booking Confirmed',
+                              isPrintAndExit
+                                  ? 'Exit Completed'
+                                  : 'Booking Confirmed',
                               style: GoogleFonts.poppins(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -291,19 +324,85 @@ class BookingTicketDialog {
                         ),
                         const Divider(height: 12),
 
+                        if (isPrintAndExit &&
+                            exitDate != null &&
+                            exitDate.isNotEmpty) ...[
+                          _buildTicketInfoRow(
+                            'Exit At',
+                            '$exitDate${(exitTime != null && exitTime.isNotEmpty) ? ', $exitTime' : ''}',
+                          ),
+                          const Divider(height: 12),
+                        ],
+
                         // Plan
                         _buildTicketInfoRow('Plan', planLabel),
-                        // const Divider(height: 12),
+                        const Divider(height: 12),
 
-                        // // Amount
-                        // _buildTicketInfoRow(
-                        //   'Amount',
-                        //   (cleanedTotalAmt.isNotEmpty && cleanedTotalAmt != '0')
-                        //       ? '₹$cleanedTotalAmt'
-                        //       : 'Free',
-                        //   valueColor: Colors.green.shade700,
-                        //   isBold: true,
-                        // ),
+                        // Total Amount (including valet if applicable)
+                        if (isPrintAndExit) ...[
+                          Container(
+                            margin: const EdgeInsets.symmetric(vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 14,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: Colors.green.shade300,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Total Amount',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade900,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      displayAmount,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 34,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.green.shade700,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else ...[
+                          _buildTicketInfoRow(
+                            'Total Amount',
+                            displayAmount,
+                            valueColor: Colors.green.shade700,
+                            isBold: true,
+                          ),
+                        ],
+
+
+
+
+
+
+
+
+
+
 
                         if (personName.trim().isNotEmpty) ...[
                           const Divider(height: 12),
@@ -318,10 +417,9 @@ class BookingTicketDialog {
                     ),
                   ),
 
-                  const SizedBox(height: 14),
-
-                  // QR Code
-                  if (bookingId.isNotEmpty) ...[
+                  // QR Code (suppressed on Print and Exit as the vehicle is already exiting)
+                  if (!isPrintAndExit && bookingId.isNotEmpty) ...[
+                    const SizedBox(height: 14),
                     Center(
                       child: Container(
                         padding: const EdgeInsets.all(10),
@@ -357,6 +455,8 @@ class BookingTicketDialog {
                       ),
                     ),
                     const SizedBox(height: 16),
+                  ] else ...[
+                    const SizedBox(height: 16),
                   ],
 
                   // Action Buttons: Print & Done
@@ -391,6 +491,7 @@ class BookingTicketDialog {
                               bookType: bookType ?? '',
                               sts: receiptSts,
                               instantParkingReceipt: instantParkingReceipt,
+                              isPrintAndExit: isPrintAndExit,
                             );
                           },
                           icon: const Icon(Icons.print, size: 16),
@@ -415,9 +516,9 @@ class BookingTicketDialog {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () => Navigator.pop(dialogContext),
-                          icon: const Icon(Icons.check, size: 16),
+                          icon: const Icon(Icons.close, size: 16),
                           label: Text(
-                            'Done',
+                            'Close',
                             style: GoogleFonts.poppins(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,

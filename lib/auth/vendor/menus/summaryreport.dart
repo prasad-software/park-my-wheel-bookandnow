@@ -16,6 +16,7 @@ import '../../../pageloader.dart';
 import 'custom_report.dart'; // Import CustomReportScreen
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../services/local_db_service.dart';
+import '../../customer/parking/bookparking.dart';
 
 class SummaryReportScreen extends StatefulWidget {
   final String vendorid;
@@ -48,10 +49,31 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
   String? _error;
 
   List<Bookingdata> _bookings = [];
+  Vendor? _vendor = GlobalVendorDashCache.vendor;
+
+  Future<void> _fetchVendorData() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}'),
+      );
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        if (data['data'] != null && mounted) {
+          setState(() {
+            _vendor = Vendor.fromJson(data['data']);
+            GlobalVendorDashCache.vendor = _vendor;
+          });
+        }
+      }
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
+    if (_vendor == null) {
+      _fetchVendorData();
+    }
     _tabController = TabController(length: 2, vsync: this);
     _selectedStartDate = _defaultStartDate;
     _selectedEndDate = _defaultEndDate;
@@ -590,7 +612,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
 
   double _amountForBooking(Bookingdata b) {
     final s = (b.totalamout.trim().isNotEmpty ? b.totalamout : b.amount).trim();
-    final baseAmount = double.tryParse(s) ?? 0.0;
+    double baseAmount = double.tryParse(s) ?? 0.0;
 
     final isPassOrSub = isPassOrSubscriptionSts(b.sts, b.bookType);
 
@@ -600,9 +622,32 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
       return 0.0;
     }
 
+    final v = _vendor ?? GlobalVendorDashCache.vendor;
+    if (!isPassOrSub && v != null) {
+      final vType = b.vehicletype.toLowerCase();
+      double cap = 0.0;
+      if (vType.contains('bike')) {
+        cap = v.maxBikeAmount;
+      } else if (vType.contains('car')) {
+        cap = v.maxCarAmount;
+      } else {
+        cap = v.maxOthersAmount;
+      }
+      if (cap > 0 && baseAmount > cap) {
+        baseAmount = cap;
+      }
+    }
+
     final valetAmount =
         isPassOrSub ? 0.0 : (double.tryParse(b.valetCharge) ?? 0.0);
-    return baseAmount + valetAmount;
+    double total = baseAmount;
+    if (v == null || v.maxCarAmount <= 0 || baseAmount < v.maxCarAmount) {
+      total += valetAmount;
+      if (v != null && v.maxCarAmount > 0 && total > v.maxCarAmount) {
+        total = v.maxCarAmount;
+      }
+    }
+    return total;
   }
 
   _SummaryTotals _computeTotals(List<Bookingdata> list) {

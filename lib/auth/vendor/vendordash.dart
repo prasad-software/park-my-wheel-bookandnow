@@ -48,6 +48,7 @@ Map<String, String> globalSelectedPaymentModes = {};
 
 class GlobalVendorDashCache {
   static String? currentVendorId;
+  static Vendor? vendor;
   static List<Bookingdata>? carsOnParking;
   static List<Bookingdata>? carsCompleted;
   static List<Bookingdata>? bikesOnParking;
@@ -57,6 +58,7 @@ class GlobalVendorDashCache {
 
   static void clear() {
     currentVendorId = null;
+    vendor = null;
     carsOnParking = null;
     carsCompleted = null;
     bikesOnParking = null;
@@ -64,6 +66,29 @@ class GlobalVendorDashCache {
     othersOnParking = null;
     othersCompleted = null;
   }
+}
+
+bool _isInstantBooking(Bookingdata b) {
+  final sts = b.sts.trim().toLowerCase();
+  final bType = b.bookType.trim().toLowerCase();
+  if (b.subscriptiontype.trim().isNotEmpty) return false;
+  if (['subscription', 'weekly', '15day', 'monthly'].contains(sts)) return false;
+  if (RegExp(r'^\d+hr$', caseSensitive: false).hasMatch(sts)) return false;
+  if (['weekly', 'monthly', 'subscription', '12 hours', '24 hours', '48 hours', '72 hours', 'fullday', 'full day', 'pass'].contains(bType)) {
+    return false;
+  }
+  return true;
+}
+
+bool _isInstantBookingStrings(String? sts, String? bookType) {
+  final s = (sts ?? '').trim().toLowerCase();
+  final b = (bookType ?? '').trim().toLowerCase();
+  if (['subscription', 'weekly', '15day', 'monthly'].contains(s)) return false;
+  if (RegExp(r'^\d+hr$', caseSensitive: false).hasMatch(s)) return false;
+  if (['weekly', 'monthly', 'subscription', '12 hours', '24 hours', '48 hours', '72 hours', 'fullday', 'full day', 'pass'].contains(b)) {
+    return false;
+  }
+  return true;
 }
 
 class vendordashScreen extends StatefulWidget {
@@ -826,6 +851,7 @@ class _HomeScreenState extends State<vendordashScreen>
         if (data['data'] != null) {
           setState(() {
             _vendor = Vendor.fromJson(data['data']);
+            GlobalVendorDashCache.vendor = _vendor;
           });
         } else {
           throw Exception(data['message'] ?? 'Unknown error occurred');
@@ -1483,16 +1509,19 @@ class _HomeScreenState extends State<vendordashScreen>
                               vendorid: widget.vendorid,
                               tab: "0",
                               defaultVendorName: _vendor?.vendorName,
+                              vendor: _vendor,
                             ),
                             BikesTab(
                               vendorid: widget.vendorid,
                               tab: "1",
                               defaultVendorName: _vendor?.vendorName,
+                              vendor: _vendor,
                             ),
                             OthersTab(
                               vendorid: widget.vendorid,
                               tab: "2",
                               defaultVendorName: _vendor?.vendorName,
+                              vendor: _vendor,
                             ),
                           ],
                         ),
@@ -1825,17 +1854,20 @@ class CarsTab extends StatefulWidget {
   final String vendorid;
   final String tab;
   final String? defaultVendorName;
+  final Vendor? vendor;
   const CarsTab({
     super.key,
     required this.vendorid,
     required this.tab,
     this.defaultVendorName,
+    this.vendor,
   });
   @override
   _CarsTabState createState() => _CarsTabState();
 }
 
 class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
+  Vendor? get _vendor => widget.vendor ?? GlobalVendorDashCache.vendor;
   late final TabController _controller;
   int selectedTabIndex = 0;
   DateTime selectedDateTime =
@@ -1960,6 +1992,21 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
           });
         }
       }
+      if (GlobalVendorDashCache.vendor == null) {
+        try {
+          final vendorResponse = await http.get(
+            Uri.parse(
+              '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}',
+            ),
+          );
+          if (vendorResponse.statusCode == 200) {
+            final Map<String, dynamic> vData = json.decode(vendorResponse.body);
+            if (vData['data'] != null) {
+              GlobalVendorDashCache.vendor = Vendor.fromJson(vData['data']);
+            }
+          }
+        } catch (_) {}
+      }
     } catch (e) {
       print('Error fetching initial data: $e');
     }
@@ -2012,6 +2059,10 @@ class _CarsTabState extends State<CarsTab> with SingleTickerProviderStateMixin {
                 gstPercentage,
                 handlingFee,
               );
+              final maxCar = _vendor?.maxCarAmount ?? 0.0;
+              if (maxCar > 0 && total > maxCar && _isInstantBooking(booking)) {
+                total = maxCar;
+              }
               booking.currentCalculatedAmount = total.toStringAsFixed(2);
             }
           }
@@ -2518,11 +2569,13 @@ class BikesTab extends StatefulWidget {
   final String tab;
   final String vendorid;
   final String? defaultVendorName;
+  final Vendor? vendor;
   const BikesTab({
     super.key,
     required this.vendorid,
     required this.tab,
     this.defaultVendorName,
+    this.vendor,
   });
   @override
   _BikesTabState createState() => _BikesTabState();
@@ -2530,6 +2583,7 @@ class BikesTab extends StatefulWidget {
 
 class _BikesTabState extends State<BikesTab>
     with SingleTickerProviderStateMixin {
+  Vendor? get _vendor => widget.vendor ?? GlobalVendorDashCache.vendor;
   late final TabController _controller;
   int selectedTabIndex = 0;
   DateTime selectedDateTime =
@@ -2547,7 +2601,9 @@ class _BikesTabState extends State<BikesTab>
     selectedDateTime = DateTime.now();
     _controller = TabController(vsync: this, length: 2);
     _payableTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      updatePayableTimes();
+      if (mounted) {
+        updatePayableTimes();
+      }
     });
 
     _controller.addListener(() {
@@ -2623,6 +2679,21 @@ class _BikesTabState extends State<BikesTab>
           });
         }
       }
+      if (GlobalVendorDashCache.vendor == null) {
+        try {
+          final vendorResponse = await http.get(
+            Uri.parse(
+              '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}',
+            ),
+          );
+          if (vendorResponse.statusCode == 200) {
+            final Map<String, dynamic> vData = json.decode(vendorResponse.body);
+            if (vData['data'] != null) {
+              GlobalVendorDashCache.vendor = Vendor.fromJson(vData['data']);
+            }
+          }
+        } catch (_) {}
+      }
     } catch (e) {
       print('Error fetching initial data: $e');
     }
@@ -2658,6 +2729,10 @@ class _BikesTabState extends State<BikesTab>
                 gstPercentage,
                 handlingFee,
               );
+              final maxBike = _vendor?.maxBikeAmount ?? 0.0;
+              if (maxBike > 0 && total > maxBike && _isInstantBooking(booking)) {
+                total = maxBike;
+              }
               booking.currentCalculatedAmount = total.toStringAsFixed(2);
             }
           }
@@ -3194,11 +3269,13 @@ class OthersTab extends StatefulWidget {
   final String vendorid;
   final String tab;
   final String? defaultVendorName;
+  final Vendor? vendor;
   const OthersTab({
     super.key,
     required this.vendorid,
     required this.tab,
     this.defaultVendorName,
+    this.vendor,
   });
   @override
   _OthersTabState createState() => _OthersTabState();
@@ -3206,6 +3283,7 @@ class OthersTab extends StatefulWidget {
 
 class _OthersTabState extends State<OthersTab>
     with SingleTickerProviderStateMixin {
+  Vendor? get _vendor => widget.vendor ?? GlobalVendorDashCache.vendor;
   late final TabController _controller;
   int selectedTabIndex = 0;
   DateTime selectedDateTime =
@@ -3223,7 +3301,9 @@ class _OthersTabState extends State<OthersTab>
     selectedDateTime = DateTime.now();
     _controller = TabController(vsync: this, length: 2);
     _payableTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      updatePayableTimes();
+      if (mounted) {
+        updatePayableTimes();
+      }
     });
     _controller.addListener(() {
       setState(() {
@@ -3301,6 +3381,21 @@ class _OthersTabState extends State<OthersTab>
           });
         }
       }
+      if (GlobalVendorDashCache.vendor == null) {
+        try {
+          final vendorResponse = await http.get(
+            Uri.parse(
+              '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=${widget.vendorid}',
+            ),
+          );
+          if (vendorResponse.statusCode == 200) {
+            final Map<String, dynamic> vData = json.decode(vendorResponse.body);
+            if (vData['data'] != null) {
+              GlobalVendorDashCache.vendor = Vendor.fromJson(vData['data']);
+            }
+          }
+        } catch (_) {}
+      }
     } catch (e) {
       print('Error fetching initial data: $e');
     }
@@ -3336,6 +3431,10 @@ class _OthersTabState extends State<OthersTab>
                 gstPercentage,
                 handlingFee,
               );
+              final maxOthers = _vendor?.maxOthersAmount ?? 0.0;
+              if (maxOthers > 0 && total > maxOthers && _isInstantBooking(booking)) {
+                total = maxOthers;
+              }
               booking.currentCalculatedAmount = total.toStringAsFixed(2);
             }
           }
@@ -4778,11 +4877,17 @@ class UniversalPrintHelper {
     ).firstMatch(stsNorm);
     final v = double.tryParse(amount.toString().trim());
     double finalAmtSunmi = v ?? 0.0;
-    if (valetCharge != null && valetCharge > 0) {
+    if (!isPrintAndExit && valetCharge != null && valetCharge > 0) {
       finalAmtSunmi += valetCharge;
+      if (GlobalVendorDashCache.vendor != null && _isInstantBookingStrings(sts, bookType)) {
+        final cap = GlobalVendorDashCache.vendor!.maxCarAmount;
+        if (cap > 0 && finalAmtSunmi > cap && vehicleType.toLowerCase().contains('car')) {
+          finalAmtSunmi = cap;
+        }
+      }
     }
     final cleanedAmt =
-        (v == null && (valetCharge == null || valetCharge == 0))
+        (v == null && (valetCharge == null || valetCharge == 0 || isPrintAndExit))
             ? amount.trim()
             : (finalAmtSunmi == finalAmtSunmi.roundToDouble()
                 ? finalAmtSunmi.round().toString()
@@ -5003,11 +5108,17 @@ class UniversalPrintHelper {
     ).firstMatch(stsNormEsc);
     final escV = double.tryParse(amount.toString().trim());
     double finalAmtEsc = escV ?? 0.0;
-    if (valetCharge != null && valetCharge > 0) {
+    if (!isPrintAndExit && valetCharge != null && valetCharge > 0) {
       finalAmtEsc += valetCharge;
+      if (GlobalVendorDashCache.vendor != null && _isInstantBookingStrings(sts, bookType)) {
+        final cap = GlobalVendorDashCache.vendor!.maxCarAmount;
+        if (cap > 0 && finalAmtEsc > cap && vehicleType.toLowerCase().contains('car')) {
+          finalAmtEsc = cap;
+        }
+      }
     }
     final cleanedEscAmt =
-        (escV == null && (valetCharge == null || valetCharge == 0))
+        (escV == null && (valetCharge == null || valetCharge == 0 || isPrintAndExit))
             ? amount.trim()
             : (finalAmtEsc == finalAmtEsc.roundToDouble()
                 ? finalAmtEsc.round().toString()
@@ -5207,6 +5318,42 @@ class UniversalPrintHelper {
       // Use the amount that's already calculated and passed to printTicket
       // This amount comes from getPrintAmount which is called in the print button
       String currentAmount = amount;
+      if (GlobalVendorDashCache.vendor == null && vendorId.isNotEmpty) {
+        try {
+          final vendorResponse = await http
+              .get(
+                Uri.parse(
+                  '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=$vendorId',
+                ),
+              )
+              .timeout(const Duration(seconds: 3));
+          if (vendorResponse.statusCode == 200) {
+            final Map<String, dynamic> vData = json.decode(vendorResponse.body);
+            if (vData['data'] != null) {
+              GlobalVendorDashCache.vendor = Vendor.fromJson(vData['data']);
+            }
+          }
+        } catch (_) {}
+      }
+      if (GlobalVendorDashCache.vendor != null && _isInstantBookingStrings(sts, bookType)) {
+        final v = GlobalVendorDashCache.vendor!;
+        final vt = vehicleType.toLowerCase();
+        double cap = 0.0;
+        if (vt.contains('bike')) {
+          cap = v.maxBikeAmount;
+        } else if (vt.contains('car')) {
+          cap = v.maxCarAmount;
+        } else {
+          cap = v.maxOthersAmount;
+        }
+        final parsed = double.tryParse(currentAmount.trim()) ?? 0.0;
+        if (cap > 0 && parsed > cap) {
+          currentAmount = (cap == cap.roundToDouble())
+              ? cap.round().toString()
+              : cap.toStringAsFixed(2);
+          print('Clamped printTicket amount to ceiling cap: $currentAmount');
+        }
+      }
       print('Using amount from printTicket parameter: $currentAmount');
 
       final String resolvedInvoiceId = await resolveInvoiceIdForPrint(
@@ -5303,7 +5450,7 @@ class UniversalPrintHelper {
             skipChargeLookup: skipChargeLookup,
             instantParkingReceipt: instantParkingReceipt,
             isPrintAndExit: isPrintAndExit,
-            valetCharge: valetCharge,
+            valetCharge: isPrintAndExit ? null : valetCharge,
             operationalTimings: operationalTimings,
             isEntryReceipt: formattedDuration.isEmpty,
           );
@@ -5333,7 +5480,7 @@ class UniversalPrintHelper {
             skipChargeLookup: skipChargeLookup,
             instantParkingReceipt: instantParkingReceipt,
             isPrintAndExit: isPrintAndExit,
-            valetCharge: valetCharge,
+            valetCharge: isPrintAndExit ? null : valetCharge,
             operationalTimings: operationalTimings,
             isEntryReceipt: formattedDuration.isEmpty,
           );
@@ -5665,6 +5812,26 @@ class UniversalPrintHelper {
       print('Error fetching amount from vendor/fet: $e');
     }
 
+    // Fallback: Try fast-exit-data if vendor/fet was unable to provide amount
+    try {
+      final fastExitUrl = Uri.parse('${ApiConfig.baseUrl}vendor/fast-exit-data/$bookingId');
+      final fastResponse = await http.get(fastExitUrl).timeout(const Duration(seconds: 4));
+      if (fastResponse.statusCode == 200) {
+        final fData = json.decode(fastResponse.body);
+        if (fData is Map<String, dynamic>) {
+          final double cap = (fData['maxCap'] as num?)?.toDouble() ?? 0.0;
+          final String? raw = fData['amount']?.toString() ?? fData['payableAmount']?.toString();
+          if (raw != null && raw.isNotEmpty && raw != '0') {
+            final double parsed = double.tryParse(raw) ?? 0.0;
+            if (cap > 0 && parsed > cap) {
+              return (cap == cap.roundToDouble()) ? cap.round().toString() : cap.toStringAsFixed(2);
+            }
+            return raw.trim();
+          }
+        }
+      }
+    } catch (_) {}
+
     print('Returning default amount: 0');
     return '0';
   }
@@ -5945,7 +6112,10 @@ class cardashleft extends StatelessWidget {
                                                 currentAmount == '0.0' ||
                                                 currentAmount == '0.00') {
                                               currentAmount =
-                                                  vehicle.amount.toString();
+                                                  (vehicle.currentCalculatedAmount != null &&
+                                                          vehicle.currentCalculatedAmount!.isNotEmpty)
+                                                      ? vehicle.currentCalculatedAmount!
+                                                      : vehicle.amount.toString();
                                             }
 
                                             UniversalPrintHelper.printTicket(
@@ -6117,6 +6287,7 @@ class cardashleft extends StatelessWidget {
                                                             ),
                                                       ),
                                                       child: Exitpage(
+                                                        maxCap: GlobalVendorDashCache.vendor?.maxCarAmount,
                                                         paymentMode:
                                                             globalSelectedPaymentModes[vehicle
                                                                 .id] ??
@@ -6750,7 +6921,10 @@ class bikedashleft extends StatelessWidget {
                                                 currentAmount == '0.0' ||
                                                 currentAmount == '0.00') {
                                               currentAmount =
-                                                  vehicle.amount.toString();
+                                                  (vehicle.currentCalculatedAmount != null &&
+                                                          vehicle.currentCalculatedAmount!.isNotEmpty)
+                                                      ? vehicle.currentCalculatedAmount!
+                                                      : vehicle.amount.toString();
                                             }
 
                                             UniversalPrintHelper.printTicket(
@@ -6922,6 +7096,7 @@ class bikedashleft extends StatelessWidget {
                                                             ),
                                                       ),
                                                       child: Exitpage(
+                                                        maxCap: GlobalVendorDashCache.vendor?.maxBikeAmount,
                                                         paymentMode:
                                                             globalSelectedPaymentModes[vehicle
                                                                 .id] ??
@@ -7555,7 +7730,10 @@ class othersdashleft extends StatelessWidget {
                                                 currentAmount == '0.0' ||
                                                 currentAmount == '0.00') {
                                               currentAmount =
-                                                  vehicle.amount.toString();
+                                                  (vehicle.currentCalculatedAmount != null &&
+                                                          vehicle.currentCalculatedAmount!.isNotEmpty)
+                                                      ? vehicle.currentCalculatedAmount!
+                                                      : vehicle.amount.toString();
                                             }
 
                                             UniversalPrintHelper.printTicket(
@@ -7727,6 +7905,7 @@ class othersdashleft extends StatelessWidget {
                                                             ),
                                                       ),
                                                       child: Exitpage(
+                                                        maxCap: GlobalVendorDashCache.vendor?.maxOthersAmount,
                                                         paymentMode:
                                                             globalSelectedPaymentModes[vehicle
                                                                 .id] ??
@@ -8979,20 +9158,72 @@ class DashQuickExitHelper {
     }
 
     try {
-      String currentAmount;
-      try {
-        currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(
-          bookingId,
-        ).timeout(const Duration(seconds: 10));
-        if (currentAmount.isEmpty ||
-            currentAmount == '0' ||
-            currentAmount == '0.0' ||
-            currentAmount == '0.00') {
-          currentAmount = vehicle.amount.toString();
-        }
-      } catch (_) {
-        currentAmount = vehicle.amount.toString();
+      double baseAmt = 0.0;
+      if (vehicle.currentCalculatedAmount != null &&
+          vehicle.currentCalculatedAmount!.isNotEmpty &&
+          vehicle.currentCalculatedAmount != '0' &&
+          vehicle.currentCalculatedAmount != '0.0' &&
+          vehicle.currentCalculatedAmount != '0.00') {
+        baseAmt = double.tryParse(vehicle.currentCalculatedAmount!.trim()) ?? 0.0;
       }
+
+      if (baseAmt <= 0) {
+        try {
+          final fromApi = await UniversalPrintHelper.getPrintAmountFromAPI(
+            bookingId,
+          ).timeout(const Duration(seconds: 4));
+          baseAmt = double.tryParse(fromApi.trim()) ?? 0.0;
+        } catch (_) {}
+      }
+
+      if (baseAmt <= 0) {
+        baseAmt = double.tryParse(vehicle.amount.toString().trim()) ?? 0.0;
+      }
+
+      // Add valet charge if vehicle has valet
+      final double valetAmt = (vehicle.isValet ||
+              (double.tryParse(vehicle.valetCharge) ?? 0.0) > 0)
+          ? (double.tryParse(vehicle.valetCharge) ?? 0.0)
+          : 0.0;
+      double finalTotal = baseAmt + valetAmt;
+
+      if (GlobalVendorDashCache.vendor == null && vendorId.isNotEmpty) {
+        try {
+          final vendorResponse = await http
+              .get(
+                Uri.parse(
+                  '${ApiConfig.baseUrl}vendor/fetch-vendor-data?id=$vendorId',
+                ),
+              )
+              .timeout(const Duration(seconds: 3));
+          if (vendorResponse.statusCode == 200) {
+            final Map<String, dynamic> vData = json.decode(vendorResponse.body);
+            if (vData['data'] != null) {
+              GlobalVendorDashCache.vendor = Vendor.fromJson(vData['data']);
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (GlobalVendorDashCache.vendor != null && _isInstantBooking(vehicle)) {
+        final v = GlobalVendorDashCache.vendor!;
+        final vt = vehicle.vehicletype.toLowerCase();
+        double cap = 0.0;
+        if (vt.contains('bike')) {
+          cap = v.maxBikeAmount;
+        } else if (vt.contains('car')) {
+          cap = v.maxCarAmount;
+        } else {
+          cap = v.maxOthersAmount;
+        }
+        if (cap > 0 && finalTotal > cap) {
+          finalTotal = cap;
+        }
+      }
+
+      final String currentAmount = (finalTotal == finalTotal.roundToDouble())
+          ? finalTotal.round().toString()
+          : finalTotal.toStringAsFixed(2);
 
       if (!context.mounted) return;
       try {
@@ -9007,7 +9238,7 @@ class DashQuickExitHelper {
           parkingTime: vehicle.parkingTime,
           amount: currentAmount,
           personName: vehicle.username,
-          valetCharge: double.tryParse(vehicle.valetCharge) ?? 0.0,
+          valetCharge: null,
           mobileNumber: vehicle.mobilenumber,
           vendorId: vendorId,
           bookType: bookType,
@@ -9021,6 +9252,35 @@ class DashQuickExitHelper {
       }
 
       await _performQuickExit(context, vehicle, currentAmount, paymentMode);
+
+      final now = DateTime.now();
+      final exitDate = DateFormat('dd-MM-yyyy').format(now);
+      final exitTime = DateFormat('hh:mm a').format(now);
+
+      if (context.mounted) {
+        await BookingTicketDialog.show(
+          context: context,
+          vendorName: defaultVendorName ?? vehicle.vendorname,
+          bookingId: bookingId,
+          invoiceId: vehicle.invoiceid,
+          vehicleType: vehicle.vehicletype,
+          vehicleNumber: vehicle.vehicleNumber,
+          parkingDate: vehicle.parkingDate,
+          parkingTime: vehicle.parkingTime,
+          amount: currentAmount,
+          personName: vehicle.username,
+          mobileNumber: vehicle.mobilenumber,
+          receiptSts: vehicle.sts,
+          appliedValetAmount: 0.0, // currentAmount already includes valet
+          instantParkingReceipt: true,
+          vendorId: vendorId,
+          bookType: bookType,
+          isPrintAndExit: true,
+          exitDate: exitDate,
+          exitTime: exitTime,
+        );
+      }
+
       if (onExitSuccess != null) {
         onExitSuccess();
       }
