@@ -49,14 +49,18 @@ class PineLabsPrintHelper {
       ]
     };
     
-    if (duration.isNotEmpty) {
+    if (!isEntryReceipt) {
+      if (duration.isNotEmpty) {
         (printData["PrintData"] as List).add(
           {"PrintDataType": "0", "PrinterWidth": 24, "IsCenterLogo": false, "PrintData": "Duration: $duration", "IsBold": false, "IsCenter": false}
         );
+      }
+      (printData["PrintData"] as List).add(
+        {"PrintDataType": "0", "PrinterWidth": 24, "IsCenterLogo": false, "PrintData": "Amount: Rs. $amount", "IsBold": true, "IsCenter": true}
+      );
     }
     
     (printData["PrintData"] as List).addAll([
-        {"PrintDataType": "0", "PrinterWidth": 24, "IsCenterLogo": false, "PrintData": "Amount: Rs. $amount", "IsBold": true, "IsCenter": true},
         {"PrintDataType": "0", "PrinterWidth": 24, "IsCenterLogo": false, "PrintData": "Name: $personName", "IsBold": false, "IsCenter": false},
         {"PrintDataType": "0", "PrinterWidth": 24, "IsCenterLogo": false, "PrintData": "Mobile: $mobileNumber", "IsBold": false, "IsCenter": false},
         {"PrintDataType": "0", "PrinterWidth": 24, "IsCenterLogo": false, "PrintData": "--------------------------------", "IsBold": false, "IsCenter": true},

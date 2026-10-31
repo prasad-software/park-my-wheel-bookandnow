@@ -4881,8 +4881,8 @@ class UniversalPrintHelper {
         slabLines = const [];
       }
     }
-    // Always print duration (COMPLETED receipts may also have slab lines, but user expects duration).
-    if (durationText.trim().isNotEmpty) {
+    // Duration is shown ONLY on exit receipts
+    if (isPrintAndExit && durationText.trim().isNotEmpty) {
       await SunmiPrinter.printText("Duration : $durationText");
       await SunmiPrinter.lineWrap(1);
     }
@@ -4909,63 +4909,64 @@ class UniversalPrintHelper {
                 ? finalAmtSunmi.round().toString()
                 : finalAmtSunmi.toStringAsFixed(2));
 
-    if (passMatch != null) {
-      // Pass booking (12hr / 24hr / 48hr / 72hr)
-      final passHours = passMatch.group(1);
-      if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-        await SunmiPrinter.lineWrap(1);
-        final label = passHours == '24' ? 'Full Day' : '$passHours Hour';
-        await SunmiPrinter.printText('$label Pass');
-        await SunmiPrinter.lineWrap(1);
-        for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
-          await SunmiPrinter.printText(
-            line,
-            style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
-          );
+    // Parking Amount is shown ONLY on exit receipts
+    if (isPrintAndExit) {
+      if (passMatch != null) {
+        // Pass booking (12hr / 24hr / 48hr / 72hr)
+        final passHours = passMatch.group(1);
+        if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
           await SunmiPrinter.lineWrap(1);
-        }
-      }
-    } else if (stsNorm == 'weekly' || stsNorm == 'monthly') {
-      // Subscription: print weekly / monthly label with the booking amount
-      final label = stsNorm == 'weekly' ? 'Weekly' : 'Monthly';
-      if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-        await SunmiPrinter.lineWrap(1);
-        for (final line in formatBoxedLines('$label : Rs. $cleanedAmt')) {
-          await SunmiPrinter.printText(
-            line,
-            style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
-          );
+          final label = passHours == '24' ? 'Full Day' : '$passHours Hour';
+          await SunmiPrinter.printText('$label Pass');
           await SunmiPrinter.lineWrap(1);
+          for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
+            await SunmiPrinter.printText(
+              line,
+              style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
+            );
+            await SunmiPrinter.lineWrap(1);
+          }
         }
-      }
-    } else if ((bookType ?? '').trim().toLowerCase() == '24 hours' &&
-        !skipChargeLookup) {
-      String? fullDayAmt;
-      try {
-        fullDayAmt = await _getFullDayChargeFromAPI(
-          vendorId: vendorId,
-          vehicleType: vehicleType,
-        ).timeout(_chargeLookupTimeout);
-      } catch (_) {
-        fullDayAmt = null;
-      }
-      final displayAmt =
-          (fullDayAmt != null && fullDayAmt.isNotEmpty && fullDayAmt != '0')
-              ? fullDayAmt
-              : cleanedAmt;
-      if (displayAmt.isNotEmpty && displayAmt != '0') {
-        await SunmiPrinter.lineWrap(1);
-        for (final line in formatBoxedLines('Full Day : Rs. $displayAmt')) {
-          await SunmiPrinter.printText(
-            line,
-            style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
-          );
+      } else if (stsNorm == 'weekly' || stsNorm == 'monthly') {
+        // Subscription: print weekly / monthly label with the booking amount
+        final label = stsNorm == 'weekly' ? 'Weekly' : 'Monthly';
+        if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
           await SunmiPrinter.lineWrap(1);
+          for (final line in formatBoxedLines('$label : Rs. $cleanedAmt')) {
+            await SunmiPrinter.printText(
+              line,
+              style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
+            );
+            await SunmiPrinter.lineWrap(1);
+          }
         }
-      }
-    } else {
-      if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-        if (!instantParkingReceipt || isPrintAndExit) {
+      } else if ((bookType ?? '').trim().toLowerCase() == '24 hours' &&
+          !skipChargeLookup) {
+        String? fullDayAmt;
+        try {
+          fullDayAmt = await _getFullDayChargeFromAPI(
+            vendorId: vendorId,
+            vehicleType: vehicleType,
+          ).timeout(_chargeLookupTimeout);
+        } catch (_) {
+          fullDayAmt = null;
+        }
+        final displayAmt =
+            (fullDayAmt != null && fullDayAmt.isNotEmpty && fullDayAmt != '0')
+                ? fullDayAmt
+                : cleanedAmt;
+        if (displayAmt.isNotEmpty && displayAmt != '0') {
+          await SunmiPrinter.lineWrap(1);
+          for (final line in formatBoxedLines('Full Day : Rs. $displayAmt')) {
+            await SunmiPrinter.printText(
+              line,
+              style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
+            );
+            await SunmiPrinter.lineWrap(1);
+          }
+        }
+      } else {
+        if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
           await SunmiPrinter.lineWrap(1);
           for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
             await SunmiPrinter.printText(
@@ -5145,8 +5146,8 @@ class UniversalPrintHelper {
     bytes += 'Parked on : $parkingDate, $parkingTime'.codeUnits;
     bytes += [0x0A]; // Line feed
 
-    // Optionally print duration, then slab lines (if any).
-    if (includeDuration && durationText.trim().isNotEmpty) {
+    // Duration is shown ONLY on exit receipts
+    if (isPrintAndExit && includeDuration && durationText.trim().isNotEmpty) {
       bytes += 'Duration : $durationText'.codeUnits;
       bytes += [0x0A]; // Line feed
     }
@@ -5173,82 +5174,83 @@ class UniversalPrintHelper {
                 ? finalAmtEsc.round().toString()
                 : finalAmtEsc.toStringAsFixed(2));
 
-    if (passMatchEsc != null) {
-      // Pass booking: print pass label + amount
-      final passHours = passMatchEsc.group(1);
-      if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
-        final label = passHours == '24' ? 'Full Day' : '$passHours Hour';
-        bytes += '$label Pass'.codeUnits;
-        bytes += [0x0A];
-        bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
-        bytes += [0x1D, 0x21, 0x01]; // GS ! 1 (Double height - larger font size)
-        bytes += [0x1B, 0x21, 0x18]; // ESC ! 0x18 (Double height + Bold/Emphasized)
-        bytes += [0x1B, 0x45, 0x01]; // ESC E 1 (Bold ON)
-        bytes += [0x1B, 0x47, 0x01]; // ESC G 1 (Double strike ON)
-        for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedEscAmt')) {
-          bytes += line.codeUnits;
+    // Parking Amount is shown ONLY on exit receipts
+    if (isPrintAndExit) {
+      if (passMatchEsc != null) {
+        // Pass booking: print pass label + amount
+        final passHours = passMatchEsc.group(1);
+        if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
+          final label = passHours == '24' ? 'Full Day' : '$passHours Hour';
+          bytes += '$label Pass'.codeUnits;
           bytes += [0x0A];
+          bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
+          bytes += [0x1D, 0x21, 0x01]; // GS ! 1 (Double height - larger font size)
+          bytes += [0x1B, 0x21, 0x18]; // ESC ! 0x18 (Double height + Bold/Emphasized)
+          bytes += [0x1B, 0x45, 0x01]; // ESC E 1 (Bold ON)
+          bytes += [0x1B, 0x47, 0x01]; // ESC G 1 (Double strike ON)
+          for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedEscAmt')) {
+            bytes += line.codeUnits;
+            bytes += [0x0A];
+          }
+          bytes += [0x1D, 0x21, 0x00]; // GS ! 0 (Normal size)
+          bytes += [0x1B, 0x21, 0x00]; // ESC ! 0 (Normal size & no bold)
+          bytes += [0x1B, 0x45, 0x00]; // ESC E 0 (Bold OFF)
+          bytes += [0x1B, 0x47, 0x00]; // ESC G 0 (Double strike OFF)
+          bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
         }
-        bytes += [0x1D, 0x21, 0x00]; // GS ! 0 (Normal size)
-        bytes += [0x1B, 0x21, 0x00]; // ESC ! 0 (Normal size & no bold)
-        bytes += [0x1B, 0x45, 0x00]; // ESC E 0 (Bold OFF)
-        bytes += [0x1B, 0x47, 0x00]; // ESC G 0 (Double strike OFF)
-        bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
-      }
-    } else if (stsNormEsc == 'weekly' || stsNormEsc == 'monthly') {
-      // Subscription
-      final label = stsNormEsc == 'weekly' ? 'Weekly' : 'Monthly';
-      if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
-        bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
-        bytes += [0x1D, 0x21, 0x01]; // GS ! 1 (Double height - larger font size)
-        bytes += [0x1B, 0x21, 0x18]; // ESC ! 0x18 (Double height + Bold/Emphasized)
-        bytes += [0x1B, 0x45, 0x01]; // ESC E 1 (Bold ON)
-        bytes += [0x1B, 0x47, 0x01]; // ESC G 1 (Double strike ON)
-        for (final line in formatBoxedLines('$label : Rs. $cleanedEscAmt')) {
-          bytes += line.codeUnits;
-          bytes += [0x0A];
+      } else if (stsNormEsc == 'weekly' || stsNormEsc == 'monthly') {
+        // Subscription
+        final label = stsNormEsc == 'weekly' ? 'Weekly' : 'Monthly';
+        if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
+          bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
+          bytes += [0x1D, 0x21, 0x01]; // GS ! 1 (Double height - larger font size)
+          bytes += [0x1B, 0x21, 0x18]; // ESC ! 0x18 (Double height + Bold/Emphasized)
+          bytes += [0x1B, 0x45, 0x01]; // ESC E 1 (Bold ON)
+          bytes += [0x1B, 0x47, 0x01]; // ESC G 1 (Double strike ON)
+          for (final line in formatBoxedLines('$label : Rs. $cleanedEscAmt')) {
+            bytes += line.codeUnits;
+            bytes += [0x0A];
+          }
+          bytes += [0x1D, 0x21, 0x00]; // GS ! 0 (Normal size)
+          bytes += [0x1B, 0x21, 0x00]; // ESC ! 0 (Normal size & no bold)
+          bytes += [0x1B, 0x45, 0x00]; // ESC E 0 (Bold OFF)
+          bytes += [0x1B, 0x47, 0x00]; // ESC G 0 (Double strike OFF)
+          bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
         }
-        bytes += [0x1D, 0x21, 0x00]; // GS ! 0 (Normal size)
-        bytes += [0x1B, 0x21, 0x00]; // ESC ! 0 (Normal size & no bold)
-        bytes += [0x1B, 0x45, 0x00]; // ESC E 0 (Bold OFF)
-        bytes += [0x1B, 0x47, 0x00]; // ESC G 0 (Double strike OFF)
-        bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
-      }
-    } else if ((bookType ?? '').trim().toLowerCase() == '24 hours') {
-      String? fullDayAmt;
-      if (!skipChargeLookup) {
-        try {
-          fullDayAmt = await _getFullDayChargeFromAPI(
-            vendorId: vendorId,
-            vehicleType: vehicleType,
-          ).timeout(_chargeLookupTimeout);
-        } catch (_) {
-          fullDayAmt = null;
+      } else if ((bookType ?? '').trim().toLowerCase() == '24 hours') {
+        String? fullDayAmt;
+        if (!skipChargeLookup) {
+          try {
+            fullDayAmt = await _getFullDayChargeFromAPI(
+              vendorId: vendorId,
+              vehicleType: vehicleType,
+            ).timeout(_chargeLookupTimeout);
+          } catch (_) {
+            fullDayAmt = null;
+          }
         }
-      }
-      final displayAmt =
-          (fullDayAmt != null && fullDayAmt.isNotEmpty && fullDayAmt != '0')
-              ? fullDayAmt
-              : cleanedEscAmt;
-      if (displayAmt.isNotEmpty && displayAmt != '0') {
-        bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
-        bytes += [0x1D, 0x21, 0x01]; // GS ! 1 (Double height - larger font size)
-        bytes += [0x1B, 0x21, 0x18]; // ESC ! 0x18 (Double height + Bold/Emphasized)
-        bytes += [0x1B, 0x45, 0x01]; // ESC E 1 (Bold ON)
-        bytes += [0x1B, 0x47, 0x01]; // ESC G 1 (Double strike ON)
-        for (final line in formatBoxedLines('Full Day : Rs. $displayAmt')) {
-          bytes += line.codeUnits;
-          bytes += [0x0A];
+        final displayAmt =
+            (fullDayAmt != null && fullDayAmt.isNotEmpty && fullDayAmt != '0')
+                ? fullDayAmt
+                : cleanedEscAmt;
+        if (displayAmt.isNotEmpty && displayAmt != '0') {
+          bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
+          bytes += [0x1D, 0x21, 0x01]; // GS ! 1 (Double height - larger font size)
+          bytes += [0x1B, 0x21, 0x18]; // ESC ! 0x18 (Double height + Bold/Emphasized)
+          bytes += [0x1B, 0x45, 0x01]; // ESC E 1 (Bold ON)
+          bytes += [0x1B, 0x47, 0x01]; // ESC G 1 (Double strike ON)
+          for (final line in formatBoxedLines('Full Day : Rs. $displayAmt')) {
+            bytes += line.codeUnits;
+            bytes += [0x0A];
+          }
+          bytes += [0x1D, 0x21, 0x00]; // GS ! 0 (Normal size)
+          bytes += [0x1B, 0x21, 0x00]; // ESC ! 0 (Normal size & no bold)
+          bytes += [0x1B, 0x45, 0x00]; // ESC E 0 (Bold OFF)
+          bytes += [0x1B, 0x47, 0x00]; // ESC G 0 (Double strike OFF)
+          bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
         }
-        bytes += [0x1D, 0x21, 0x00]; // GS ! 0 (Normal size)
-        bytes += [0x1B, 0x21, 0x00]; // ESC ! 0 (Normal size & no bold)
-        bytes += [0x1B, 0x45, 0x00]; // ESC E 0 (Bold OFF)
-        bytes += [0x1B, 0x47, 0x00]; // ESC G 0 (Double strike OFF)
-        bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
-      }
-    } else {
-      if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
-        if (!instantParkingReceipt || isPrintAndExit) {
+      } else {
+        if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
           bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
           bytes += [0x1D, 0x21, 0x01]; // GS ! 1 (Double height - larger font size)
           bytes += [0x1B, 0x21, 0x18]; // ESC ! 0x18 (Double height + Bold/Emphasized)
@@ -5526,7 +5528,7 @@ class UniversalPrintHelper {
           duration: formattedDuration,
           sts: sts,
           bookType: bookType,
-          isEntryReceipt: formattedDuration.isEmpty,
+          isEntryReceipt: !isPrintAndExit,
         );
         return;
       } else if (printerType == 'sumi' || printerType == 'sunmi') {
@@ -5554,7 +5556,7 @@ class UniversalPrintHelper {
             isPrintAndExit: isPrintAndExit,
             valetCharge: isPrintAndExit ? null : valetCharge,
             operationalTimings: operationalTimings,
-            isEntryReceipt: formattedDuration.isEmpty,
+            isEntryReceipt: !isPrintAndExit,
           );
         } else {
           _clearPrinterCache();
@@ -5584,7 +5586,8 @@ class UniversalPrintHelper {
             isPrintAndExit: isPrintAndExit,
             valetCharge: isPrintAndExit ? null : valetCharge,
             operationalTimings: operationalTimings,
-            isEntryReceipt: formattedDuration.isEmpty,
+            includeDuration: isPrintAndExit,
+            isEntryReceipt: !isPrintAndExit,
           );
         } else {
           _clearPrinterCache();

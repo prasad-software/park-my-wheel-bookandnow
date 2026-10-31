@@ -3845,6 +3845,31 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     await SunmiPrinter.printText("Parked on : $parkingDate, $parkingTime");
     await SunmiPrinter.lineWrap(1);
 
+    // Duration is shown ONLY on exit receipts
+    if (isPrintAndExit) {
+      final DateTime? parkingDateTime = UniversalPrintHelper.tryParseDateTime(
+        date: parkingDate,
+        time: parkingTime,
+      );
+      String durationText = '00 Hours 01 Minute';
+      if (parkingDateTime != null) {
+        final calcDuration = DateTime.now().difference(parkingDateTime);
+        if (!calcDuration.isNegative) {
+          final hours = calcDuration.inHours.toString().padLeft(2, '0');
+          final minutes = calcDuration.inMinutes
+              .remainder(60)
+              .toString()
+              .padLeft(2, '0');
+          final formatted = '$hours Hours $minutes Minutes';
+          if (formatted != '00 Hours 00 Minutes') {
+            durationText = formatted;
+          }
+        }
+      }
+      await SunmiPrinter.printText("Duration : $durationText");
+      await SunmiPrinter.lineWrap(1);
+    }
+
     // Prefer `receiptSts` captured with the booking request so the slip matches what was
     // sent to the API (avoids hourly slabs if UI `_selectedPass` drifts after UPI, valet focus, etc.).
     final String snap = (receiptSts ?? '').trim().toLowerCase();
@@ -3871,59 +3896,60 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
     }
     final cleanedAmt = _cleanAmountForReceipt(finalAmt.toString());
 
-    if (isPass && passHoursForReceipt != null) {
-      // Pass booking (12hr / 24hr / 48hr / 72hr)
-      if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-        final label =
-            passHoursForReceipt == 24
-                ? 'Full Day'
-                : '$passHoursForReceipt Hour';
-        await SunmiPrinter.printText('$label Pass');
-        await SunmiPrinter.lineWrap(1);
-        for (final line in UniversalPrintHelper.formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
-          await SunmiPrinter.printText(
-            line,
-            style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
-          );
+    // Parking Amount is shown ONLY on exit receipts
+    if (isPrintAndExit) {
+      if (isPass && passHoursForReceipt != null) {
+        // Pass booking (12hr / 24hr / 48hr / 72hr)
+        if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
+          final label =
+              passHoursForReceipt == 24
+                  ? 'Full Day'
+                  : '$passHoursForReceipt Hour';
+          await SunmiPrinter.printText('$label Pass');
           await SunmiPrinter.lineWrap(1);
+          for (final line in UniversalPrintHelper.formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
+            await SunmiPrinter.printText(
+              line,
+              style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
+            );
+            await SunmiPrinter.lineWrap(1);
+          }
         }
-      }
-    } else if (isSubscription) {
-      // Subscription: label from snapshot sts when available
-      String label;
-      if (snap == 'weekly' ||
-          (receiptSts == null && _isWeeklySubscriptionSelected())) {
-        label = 'Weekly';
-      } else if (snap == '15day' ||
-          (receiptSts == null && _is15DaySubscriptionSelected())) {
-        label = '15 Days';
+      } else if (isSubscription) {
+        // Subscription: label from snapshot sts when available
+        String label;
+        if (snap == 'weekly' ||
+            (receiptSts == null && _isWeeklySubscriptionSelected())) {
+          label = 'Weekly';
+        } else if (snap == '15day' ||
+            (receiptSts == null && _is15DaySubscriptionSelected())) {
+          label = '15 Days';
+        } else {
+          label = 'Monthly';
+        }
+        if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
+          for (final line in UniversalPrintHelper.formatBoxedLines('$label : Rs. $cleanedAmt')) {
+            await SunmiPrinter.printText(
+              line,
+              style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
+            );
+            await SunmiPrinter.lineWrap(1);
+          }
+        }
+      } else if (!isHourly) {
+        // 24-hour (full day) mode
+        if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
+          for (final line in UniversalPrintHelper.formatBoxedLines('Full Day : Rs. $cleanedAmt')) {
+            await SunmiPrinter.printText(
+              line,
+              style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
+            );
+            await SunmiPrinter.lineWrap(1);
+          }
+        }
       } else {
-        label = 'Monthly';
-      }
-      if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-        for (final line in UniversalPrintHelper.formatBoxedLines('$label : Rs. $cleanedAmt')) {
-          await SunmiPrinter.printText(
-            line,
-            style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
-          );
-          await SunmiPrinter.lineWrap(1);
-        }
-      }
-    } else if (!isHourly) {
-      // 24-hour (full day) mode
-      if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-        for (final line in UniversalPrintHelper.formatBoxedLines('Full Day : Rs. $cleanedAmt')) {
-          await SunmiPrinter.printText(
-            line,
-            style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
-          );
-          await SunmiPrinter.lineWrap(1);
-        }
-      }
-    } else {
-      // Hourly, no pass
-      if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-        if (!instantParkingReceipt || isPrintAndExit) {
+        // Hourly, no pass
+        if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
           for (final line in UniversalPrintHelper.formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
             await SunmiPrinter.printText(
               line,
