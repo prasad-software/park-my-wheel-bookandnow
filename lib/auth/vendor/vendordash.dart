@@ -4920,7 +4920,7 @@ class UniversalPrintHelper {
         for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
           await SunmiPrinter.printText(
             line,
-            style: SunmiTextStyle(bold: true),
+            style: SunmiTextStyle(align: SunmiPrintAlign.CENTER, bold: true),
           );
           await SunmiPrinter.lineWrap(1);
         }
@@ -4933,7 +4933,7 @@ class UniversalPrintHelper {
         for (final line in formatBoxedLines('$label : Rs. $cleanedAmt')) {
           await SunmiPrinter.printText(
             line,
-            style: SunmiTextStyle(bold: true),
+            style: SunmiTextStyle(align: SunmiPrintAlign.CENTER, bold: true),
           );
           await SunmiPrinter.lineWrap(1);
         }
@@ -4958,7 +4958,7 @@ class UniversalPrintHelper {
         for (final line in formatBoxedLines('Full Day : Rs. $displayAmt')) {
           await SunmiPrinter.printText(
             line,
-            style: SunmiTextStyle(bold: true),
+            style: SunmiTextStyle(align: SunmiPrintAlign.CENTER, bold: true),
           );
           await SunmiPrinter.lineWrap(1);
         }
@@ -4970,7 +4970,7 @@ class UniversalPrintHelper {
           for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
             await SunmiPrinter.printText(
               line,
-              style: SunmiTextStyle(bold: true),
+              style: SunmiTextStyle(align: SunmiPrintAlign.CENTER, bold: true),
             );
             await SunmiPrinter.lineWrap(1);
           }
@@ -5115,6 +5115,7 @@ class UniversalPrintHelper {
     bytes += [0x0A]; // Line feed
 
     // Separator
+    bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
     bytes += '**************************'.codeUnits;
     bytes += [0x0A]; // Line feed
 
@@ -5179,23 +5180,27 @@ class UniversalPrintHelper {
         final label = passHours == '24' ? 'Full Day' : '$passHours Hour';
         bytes += '$label Pass'.codeUnits;
         bytes += [0x0A];
+        bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
         bytes += [0x1B, 0x45, 0x01, 0x1B, 0x47, 0x01]; // ESC E 1 + ESC G 1 (Bold ON)
         for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedEscAmt')) {
           bytes += line.codeUnits;
           bytes += [0x0A];
         }
         bytes += [0x1B, 0x45, 0x00, 0x1B, 0x47, 0x00]; // Bold OFF
+        bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
       }
     } else if (stsNormEsc == 'weekly' || stsNormEsc == 'monthly') {
       // Subscription
       final label = stsNormEsc == 'weekly' ? 'Weekly' : 'Monthly';
       if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
+        bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
         bytes += [0x1B, 0x45, 0x01, 0x1B, 0x47, 0x01]; // ESC E 1 + ESC G 1 (Bold ON)
         for (final line in formatBoxedLines('$label : Rs. $cleanedEscAmt')) {
           bytes += line.codeUnits;
           bytes += [0x0A];
         }
         bytes += [0x1B, 0x45, 0x00, 0x1B, 0x47, 0x00]; // Bold OFF
+        bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
       }
     } else if ((bookType ?? '').trim().toLowerCase() == '24 hours') {
       String? fullDayAmt;
@@ -5214,22 +5219,26 @@ class UniversalPrintHelper {
               ? fullDayAmt
               : cleanedEscAmt;
       if (displayAmt.isNotEmpty && displayAmt != '0') {
+        bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
         bytes += [0x1B, 0x45, 0x01, 0x1B, 0x47, 0x01]; // ESC E 1 + ESC G 1 (Bold ON)
         for (final line in formatBoxedLines('Full Day : Rs. $displayAmt')) {
           bytes += line.codeUnits;
           bytes += [0x0A];
         }
         bytes += [0x1B, 0x45, 0x00, 0x1B, 0x47, 0x00]; // Bold OFF
+        bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
       }
     } else {
       if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
         if (!instantParkingReceipt || isPrintAndExit) {
+          bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
           bytes += [0x1B, 0x45, 0x01, 0x1B, 0x47, 0x01]; // ESC E 1 + ESC G 1 (Bold ON)
           for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedEscAmt')) {
             bytes += line.codeUnits;
             bytes += [0x0A];
           }
           bytes += [0x1B, 0x45, 0x00, 0x1B, 0x47, 0x00]; // Bold OFF
+          bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
         }
       }
     }
@@ -5304,6 +5313,7 @@ class UniversalPrintHelper {
               .codeUnits;
       bytes += [0x0A]; // Line feed
     }
+    bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
     bytes += '**************************'.codeUnits;
     bytes += [0x0A]; // Line feed (footer on next line)
     // Footer - Powered by (Centered)

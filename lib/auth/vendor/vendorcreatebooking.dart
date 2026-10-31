@@ -3064,7 +3064,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                               amount: amount,
                               personName: personName,
                               mobileNumber: mobileNumber,
-                              includeDuration: false,
+                              includeDuration: isPrintAndExit,
                               receiptSts: receiptSts,
                               instantParkingReceipt: instantParkingReceipt,
                               isPrintAndExit: isPrintAndExit,
@@ -3883,7 +3883,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         for (final line in UniversalPrintHelper.formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
           await SunmiPrinter.printText(
             line,
-            style: SunmiTextStyle(bold: true),
+            style: SunmiTextStyle(align: SunmiPrintAlign.CENTER, bold: true),
           );
           await SunmiPrinter.lineWrap(1);
         }
@@ -3904,7 +3904,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         for (final line in UniversalPrintHelper.formatBoxedLines('$label : Rs. $cleanedAmt')) {
           await SunmiPrinter.printText(
             line,
-            style: SunmiTextStyle(bold: true),
+            style: SunmiTextStyle(align: SunmiPrintAlign.CENTER, bold: true),
           );
           await SunmiPrinter.lineWrap(1);
         }
@@ -3915,7 +3915,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         for (final line in UniversalPrintHelper.formatBoxedLines('Full Day : Rs. $cleanedAmt')) {
           await SunmiPrinter.printText(
             line,
-            style: SunmiTextStyle(bold: true),
+            style: SunmiTextStyle(align: SunmiPrintAlign.CENTER, bold: true),
           );
           await SunmiPrinter.lineWrap(1);
         }
@@ -3927,7 +3927,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           for (final line in UniversalPrintHelper.formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
             await SunmiPrinter.printText(
               line,
-              style: SunmiTextStyle(bold: true),
+              style: SunmiTextStyle(align: SunmiPrintAlign.CENTER, bold: true),
             );
             await SunmiPrinter.lineWrap(1);
           }
@@ -4096,7 +4096,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           mobileNumber: mobileNumber,
           duration: '',
           bookType: isHourly ? 'Hourly' : '24 Hours',
-          isEntryReceipt: true,
+          isEntryReceipt: !isPrintAndExit,
         );
         return;
       }
@@ -4142,7 +4142,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           personName: personName,
           mobileNumber: mobileNumber,
           includeDuration: includeDuration,
-          isEntryReceipt: !includeDuration,
+          isEntryReceipt: !isPrintAndExit,
           sts: receiptSts ?? _stsForBookingRequest(),
           bookType: isHourly ? 'Hourly' : '24 Hours',
           skipChargeLookup: true,
