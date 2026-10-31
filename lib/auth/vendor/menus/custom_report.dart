@@ -288,7 +288,10 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
   }
 
   double _amountForBooking(Bookingdata b) {
-    final s = (b.totalamout.trim().isNotEmpty ? b.totalamout : b.amount).trim();
+    String s = b.totalamout.trim();
+    if (s.isEmpty || s == '0' || s == '0.0' || s == '0.00') {
+      s = b.amount.trim();
+    }
     double baseAmount = double.tryParse(s) ?? 0.0;
     final isPassOrSub = isPassOrSubscriptionSts(b.sts, b.bookType);
 
@@ -314,16 +317,9 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
       }
     }
 
-    final valetAmount =
-        isPassOrSub ? 0.0 : (double.tryParse(b.valetCharge) ?? 0.0);
-    double total = baseAmount;
-    if (v == null || v.maxCarAmount <= 0 || baseAmount < v.maxCarAmount) {
-      total += valetAmount;
-      if (v != null && v.maxCarAmount > 0 && total > v.maxCarAmount) {
-        total = v.maxCarAmount;
-      }
-    }
-    return total;
+    // totalamout / amount already contains the complete final collected amount (base parking + valet charge + fees).
+    // Do not add valetAmount again to prevent double counting.
+    return baseAmount;
   }
 
   _CustomSummaryTotals _computeTotals(List<Bookingdata> list) {

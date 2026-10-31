@@ -2504,10 +2504,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         amountStr = await UniversalPrintHelper.getPrintAmountFromAPI(
           vehicle['_id']?.toString() ?? '',
         ).timeout(_apiTimeout);
-        if (amountStr.isEmpty ||
-            amountStr == '0' ||
-            amountStr == '0.0' ||
-            amountStr == '0.00') {
+        if (amountStr.isEmpty || amountStr == '0') {
           amountStr = _getOfflineAmount(vehicle);
         }
       } catch (_) {
@@ -2610,10 +2607,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(
           bookingId,
         ).timeout(_apiTimeout);
-        if (currentAmount.isEmpty ||
-            currentAmount == '0' ||
-            currentAmount == '0.0' ||
-            currentAmount == '0.00') {
+        if (currentAmount.isEmpty || currentAmount == '0') {
           currentAmount = _getOfflineAmount(vehicle);
         }
       } catch (e) {
@@ -2622,8 +2616,14 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
 
       // Add valet charge if vehicle has valet
       double baseAmt = double.tryParse(currentAmount.trim()) ?? 0.0;
-      final double valetAmt =
-          double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0;
+      if (baseAmt <= 0) {
+        baseAmt = double.tryParse(_getOfflineAmount(vehicle)) ?? 0.0;
+      }
+      final double valetAmt = (vehicle['isValet'] == true ||
+              vehicle['isValet'] == 'true' ||
+              (double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0) > 0)
+          ? (double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0)
+          : 0.0;
       final double finalTotal = baseAmt + valetAmt;
       currentAmount = (finalTotal == finalTotal.roundToDouble())
           ? finalTotal.round().toString()
@@ -2647,8 +2647,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
           parkingTime: vehicle['parkingTime'] ?? '',
           amount: currentAmount,
           personName: vehicle['userName'] ?? vehicle['personName'] ?? '',
-          valetCharge:
-              double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0,
+          valetCharge: null, // currentAmount already includes baseAmt + valetAmt
           mobileNumber: vehicle['mobileNumber'] ?? '',
           vendorId: vehicle['vendorId']?.toString() ?? widget.vendorid,
           bookType: vehicle['bookingType'] ?? vehicle['bookType'] ?? '',
@@ -2754,6 +2753,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         'amount': parkingCharge,
         'hour': formattedDuration,
         'paymentMode': selectedPaymentMode,
+        'totalamout': parkingCharge,
       };
 
       final userId = (vehicle['userId'] ?? '').toString().trim();

@@ -588,38 +588,78 @@ class _vSearchScreenState extends State<vSearchScreen>
         'Print & Exit: Starting for ${vehicle['vehicleNumber']} (ID: $bookingId)',
       );
 
-      String currentAmount;
+      // 1. Check if vehicle exists in GlobalVendorDashCache
+      Bookingdata? dashVehicle;
       try {
-        currentAmount = await UniversalPrintHelper.getPrintAmountFromAPI(
-          bookingId,
-        ).timeout(_apiTimeout);
-        if (currentAmount.isEmpty ||
-            currentAmount == '0' ||
-            currentAmount == '0.0' ||
-            currentAmount == '0.00') {
-          currentAmount = vehicle['amount']?.toString() ?? '0';
-        }
-      } on TimeoutException {
-        currentAmount = vehicle['amount']?.toString() ?? '0';
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Could not fetch amount in time. Continuing with exit...',
-              ),
-            ),
-          );
-        }
-      } catch (_) {
-        currentAmount = vehicle['amount']?.toString() ?? '0';
+        dashVehicle = GlobalVendorDashCache.carsOnParking
+            ?.firstWhere((v) => v.id == bookingId);
+      } catch (_) {}
+      if (dashVehicle == null) {
+        try {
+          dashVehicle = GlobalVendorDashCache.bikesOnParking
+              ?.firstWhere((v) => v.id == bookingId);
+        } catch (_) {}
+      }
+      if (dashVehicle == null) {
+        try {
+          dashVehicle = GlobalVendorDashCache.othersOnParking
+              ?.firstWhere((v) => v.id == bookingId);
+        } catch (_) {}
+      }
+
+      double baseAmt = 0.0;
+      if (dashVehicle != null &&
+          dashVehicle.currentCalculatedAmount != null &&
+          dashVehicle.currentCalculatedAmount!.isNotEmpty &&
+          dashVehicle.currentCalculatedAmount != '0' &&
+          dashVehicle.currentCalculatedAmount != '0.0' &&
+          dashVehicle.currentCalculatedAmount != '0.00') {
+        baseAmt = double.tryParse(dashVehicle.currentCalculatedAmount!.trim()) ?? 0.0;
+      }
+
+      if (baseAmt <= 0) {
+        try {
+          final fromApi = await UniversalPrintHelper.getPrintAmountFromAPI(
+            bookingId,
+          ).timeout(_apiTimeout);
+          baseAmt = double.tryParse(fromApi.trim()) ?? 0.0;
+        } catch (_) {}
+      }
+
+      if (baseAmt <= 0) {
+        baseAmt = double.tryParse(vehicle['amount']?.toString().trim() ?? '0') ?? 0.0;
       }
 
       // Add valet charge if vehicle has valet
-      double baseAmt = double.tryParse(currentAmount.trim()) ?? 0.0;
-      final double valetAmt =
-          double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0;
-      final double finalTotal = baseAmt + valetAmt;
-      currentAmount = (finalTotal == finalTotal.roundToDouble())
+      final double valetAmt = (vehicle['isValet'] == true ||
+              vehicle['isValet'] == 'true' ||
+              (double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0) > 0)
+          ? (double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0)
+          : 0.0;
+      double finalTotal = baseAmt + valetAmt;
+
+      // Apply vendor max cap if available
+      if (GlobalVendorDashCache.vendor != null) {
+        final v = GlobalVendorDashCache.vendor!;
+        final vt = (vehicle['vehicleType'] ?? '').toString().toLowerCase();
+        double cap = 0.0;
+        if (vt.contains('bike')) {
+          cap = v.maxBikeAmount;
+        } else if (vt.contains('car')) {
+          cap = v.maxCarAmount;
+        } else {
+          cap = v.maxOthersAmount;
+        }
+        if (cap > 0 && finalTotal > cap) {
+          finalTotal = cap;
+        }
+      }
+
+      final String pmKey =
+          vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? bookingId;
+      final paymentMode = _paymentModes[pmKey] ?? 'Online';
+
+      final String currentAmount = (finalTotal == finalTotal.roundToDouble())
           ? finalTotal.round().toString()
           : finalTotal.toStringAsFixed(2);
 
@@ -630,7 +670,11 @@ class _vSearchScreenState extends State<vSearchScreen>
       GlobalVendorDashCache.carsCompleted = null;
       GlobalVendorDashCache.bikesCompleted = null;
       GlobalVendorDashCache.othersCompleted = null;
-      await LocalDbService.markBookingCompletedOffline(bookingId);
+      await LocalDbService.markBookingCompletedOffline(
+        bookingId,
+        amount: double.tryParse(currentAmount) ?? finalTotal,
+        paymentMode: paymentMode,
+      );
 
       if (mounted) {
         setState(() {
@@ -672,8 +716,7 @@ class _vSearchScreenState extends State<vSearchScreen>
           parkingTime: vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
           amount: currentAmount,
           personName: vehicle['personName'] ?? '',
-          valetCharge:
-              double.tryParse(vehicle['valetCharge']?.toString() ?? '0') ?? 0.0,
+          valetCharge: null, // currentAmount already includes baseAmt + valetAmt
           mobileNumber: vehicle['mobileNumber'] ?? '',
           vendorId: vehicle['vendorId'] ?? widget.vendorid,
           bookType: vehicle['bookType'] ?? '',
@@ -800,6 +843,7 @@ class _vSearchScreenState extends State<vSearchScreen>
         'amount': parkingCharge,
         'hour': formattedDuration,
         'paymentMode': paymentMode,
+        'totalamout': parkingCharge,
       };
 
       final userId =
@@ -842,6 +886,11 @@ class _vSearchScreenState extends State<vSearchScreen>
 
         if (response.statusCode == 200) {
           GlobalRecentExits.exitedBookingIds.add(bookingId);
+          await LocalDbService.markBookingCompletedOffline(
+            bookingId,
+            amount: double.tryParse(requestBody['totalamout']?.toString() ?? requestBody['amount']?.toString() ?? '0') ?? parkingCharge,
+            paymentMode: paymentMode,
+          );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -1438,14 +1487,7 @@ class _vSearchScreenState extends State<vSearchScreen>
                                                               seconds: 10,
                                                             ),
                                                           );
-                                                      if (currentAmount
-                                                              .isEmpty ||
-                                                          currentAmount ==
-                                                              '0' ||
-                                                          currentAmount ==
-                                                              '0.0' ||
-                                                          currentAmount ==
-                                                              '0.00') {
+                                                      if (currentAmount.isEmpty || currentAmount == '0') {
                                                         currentAmount =
                                                             vehicle['amount']
                                                                 ?.toString() ??
@@ -1973,14 +2015,7 @@ class _vSearchScreenState extends State<vSearchScreen>
                                                               seconds: 10,
                                                             ),
                                                           );
-                                                      if (currentAmount
-                                                              .isEmpty ||
-                                                          currentAmount ==
-                                                              '0' ||
-                                                          currentAmount ==
-                                                              '0.0' ||
-                                                          currentAmount ==
-                                                              '0.00') {
+                                                      if (currentAmount.isEmpty || currentAmount == '0') {
                                                         currentAmount =
                                                             vehicle['amount']
                                                                 ?.toString() ??

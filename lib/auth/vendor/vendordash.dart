@@ -9032,10 +9032,14 @@ class Bookingdata {
   factory Bookingdata.fromJson(Map<String, dynamic> json) {
     final rawAmount =
         json['amount']?.toString() ??
+        json['payableamout']?.toString() ??
         json['recievableamount']?.toString() ??
         '';
     final rawTotal =
-        json['totalamout']?.toString() ?? json['totalAmount']?.toString() ?? '';
+        json['totalamout']?.toString() ??
+        json['totalAmount']?.toString() ??
+        json['payableamout']?.toString() ??
+        '';
     final parsedVehicleImages =
         (json['vehicleImages'] as List<dynamic>?)
             ?.map((e) => e.toString().trim())
@@ -9063,7 +9067,7 @@ class Bookingdata {
       mobilenumber: json['mobileNumber'] ?? "",
       id: (json['_id'] ?? json['id'] ?? '').toString(),
       otp: json['otp'] ?? "",
-      Vendorid: json['vendorId'] ?? '',
+      Vendorid: (json['vendorId'] ?? json['vendorid'] ?? '').toString(),
       status: json['status'] ?? '',
       vehicletype: json['vehicleType'] ?? '',
       Cartype: json['carType'] ?? '',
@@ -9318,6 +9322,7 @@ class DashQuickExitHelper {
       'amount': parkingCharge,
       'hour': formattedDuration,
       'paymentMode': paymentMode,
+      'totalamout': parkingCharge,
     };
 
     final userId = vehicle.userid.trim();
@@ -9361,7 +9366,11 @@ class DashQuickExitHelper {
         GlobalVendorDashCache.carsCompleted = null;
         GlobalVendorDashCache.bikesCompleted = null;
         GlobalVendorDashCache.othersCompleted = null;
-        await LocalDbService.markBookingCompletedOffline(bookingId);
+        await LocalDbService.markBookingCompletedOffline(
+          bookingId,
+          amount: parkingCharge,
+          paymentMode: paymentMode,
+        );
         GlobalVendorSearchCache.allVendors = [];
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

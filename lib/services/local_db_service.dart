@@ -318,6 +318,12 @@ class LocalDbService {
             );
 
             if (index != -1) {
+              final amtStr = (amount != null && amount > 0)
+                  ? ((amount == amount.roundToDouble())
+                      ? amount.round().toString()
+                      : amount.toStringAsFixed(2))
+                  : null;
+
               if (keyStr.contains('/onparking')) {
                 targetBooking = Map<String, dynamic>.from(
                   bookings.removeAt(index),
@@ -325,11 +331,27 @@ class LocalDbService {
                 targetBooking!['status'] = 'COMPLETED';
                 targetBooking['exitvehicledate'] = exitDate;
                 targetBooking['exitvehicletime'] = exitTime;
+                if (amtStr != null) {
+                  targetBooking['amount'] = amtStr;
+                  targetBooking['totalamout'] = amtStr;
+                }
+                if (paymentMode != null && paymentMode.isNotEmpty) {
+                  targetBooking['paymentMode'] = paymentMode;
+                  targetBooking['paymentmode'] = paymentMode;
+                }
                 await box.put(key, jsonEncode({'bookings': bookings}));
               } else {
                 bookings[index]['status'] = 'COMPLETED';
                 bookings[index]['exitvehicledate'] = exitDate;
                 bookings[index]['exitvehicletime'] = exitTime;
+                if (amtStr != null) {
+                  bookings[index]['amount'] = amtStr;
+                  bookings[index]['totalamout'] = amtStr;
+                }
+                if (paymentMode != null && paymentMode.isNotEmpty) {
+                  bookings[index]['paymentMode'] = paymentMode;
+                  bookings[index]['paymentmode'] = paymentMode;
+                }
                 if (targetBooking == null) {
                   targetBooking = Map<String, dynamic>.from(bookings[index]);
                 }

@@ -74,7 +74,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
     if (_vendor == null) {
       _fetchVendorData();
     }
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _selectedStartDate = _defaultStartDate;
     _selectedEndDate = _defaultEndDate;
     _startDateController = TextEditingController(
@@ -297,6 +297,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
 
   @override
   void dispose() {
+    _tabController.dispose();
     _startDateController.dispose();
     _endDateController.dispose();
     _empIdController.dispose();
@@ -316,17 +317,24 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
           connectivityResult.isNotEmpty &&
           connectivityResult.first != ConnectivityResult.none;
 
-      final effectiveStart = _selectedStartDate ?? _defaultStartDate;
-      final effectiveEnd = _selectedEndDate ?? _defaultEndDate;
+      final now = DateTime.now();
+      DateTime earliestStart = _selectedStartDate ?? _defaultStartDate;
+      if (now.isBefore(earliestStart)) {
+        earliestStart = now;
+      }
+      DateTime latestEnd = _selectedEndDate ?? _defaultEndDate;
+      if (now.isAfter(latestEnd)) {
+        latestEnd = now;
+      }
 
       // Buffer API query by 1 day on both sides to handle UTC vs IST timezone disparities (e.g. 12:00 AM - 05:30 AM IST).
       // Exact filtering is performed locally in _filteredBookings() and _computeTotals().
       final queryStart = DateFormat(
         'dd-MM-yyyy',
-      ).format(effectiveStart.subtract(const Duration(days: 1)));
+      ).format(earliestStart.subtract(const Duration(days: 1)));
       final queryEnd = DateFormat(
         'dd-MM-yyyy',
-      ).format(effectiveEnd.add(const Duration(days: 1)));
+      ).format(latestEnd.add(const Duration(days: 1)));
 
       List<Bookingdata> list = [];
       bool fetchSuccess = false;
@@ -552,22 +560,17 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
     return dt.isAfter(start);
   }
 
-  List<Bookingdata> _filteredBookings() {
-    DateTime start = _selectedStartDate ?? _defaultStartDate;
-    DateTime end = _selectedEndDate ?? _defaultEndDate;
-
-    if (_isFirstReport) {
-      start = DateTime(start.year, start.month, start.day, 0, 0, 0);
-      end = DateTime(end.year, end.month, end.day, 23, 59, 59, 999);
-    } else {
-      final now = DateTime.now();
-      if (end.isBefore(now)) {
-        end = now.add(const Duration(minutes: 5));
-      }
-    }
-
+  List<Bookingdata> _filterBookingsInRange({
+    required DateTime start,
+    required DateTime end,
+    required bool isInclusiveStart,
+  }) {
     return _bookings.where((b) {
-      if (b.Vendorid != widget.vendorid) return false;
+      if (b.Vendorid.isNotEmpty &&
+          widget.vendorid.isNotEmpty &&
+          b.Vendorid.trim().toLowerCase() != widget.vendorid.trim().toLowerCase()) {
+        return false;
+      }
 
       final bookingDateTime = _combineDateTime(
         b.bookingDate.isNotEmpty ? b.bookingDate : (b.parkeddate.isNotEmpty ? b.parkeddate : b.parkingDate),
@@ -581,7 +584,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
       bool isBookedInRange = false;
       if (bookingDateTime != null) {
         isBookedInRange =
-            _isDateTimeAfterStart(bookingDateTime, start, _isFirstReport) &&
+            _isDateTimeAfterStart(bookingDateTime, start, isInclusiveStart) &&
             (bookingDateTime.isAtSameMomentAs(end) ||
                 bookingDateTime.isBefore(end));
       }
@@ -591,7 +594,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
       bool isExitedInRange = false;
       if (isExitedStatus && exitDateTime != null) {
         isExitedInRange =
-            _isDateTimeAfterStart(exitDateTime, start, _isFirstReport) &&
+            _isDateTimeAfterStart(exitDateTime, start, isInclusiveStart) &&
             (exitDateTime.isAtSameMomentAs(end) || exitDateTime.isBefore(end));
       }
 
@@ -610,8 +613,44 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
     }).toList();
   }
 
+  List<Bookingdata> _filteredBookings() {
+    DateTime start = _selectedStartDate ?? _defaultStartDate;
+    DateTime end = _selectedEndDate ?? _defaultEndDate;
+
+    if (_isFirstReport) {
+      start = DateTime(start.year, start.month, start.day, 0, 0, 0);
+      end = DateTime(end.year, end.month, end.day, 23, 59, 59, 999);
+    } else {
+      final now = DateTime.now();
+      if (end.isBefore(now)) {
+        end = now.add(const Duration(minutes: 5));
+      }
+    }
+
+    return _filterBookingsInRange(
+      start: start,
+      end: end,
+      isInclusiveStart: _isFirstReport,
+    );
+  }
+
+  List<Bookingdata> _filteredTodayBookings() {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    final end = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+
+    return _filterBookingsInRange(
+      start: start,
+      end: end,
+      isInclusiveStart: true,
+    );
+  }
+
   double _amountForBooking(Bookingdata b) {
-    final s = (b.totalamout.trim().isNotEmpty ? b.totalamout : b.amount).trim();
+    String s = b.totalamout.trim();
+    if (s.isEmpty || s == '0' || s == '0.0' || s == '0.00') {
+      s = b.amount.trim();
+    }
     double baseAmount = double.tryParse(s) ?? 0.0;
 
     final isPassOrSub = isPassOrSubscriptionSts(b.sts, b.bookType);
@@ -638,30 +677,39 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
       }
     }
 
-    final valetAmount =
-        isPassOrSub ? 0.0 : (double.tryParse(b.valetCharge) ?? 0.0);
-    double total = baseAmount;
-    if (v == null || v.maxCarAmount <= 0 || baseAmount < v.maxCarAmount) {
-      total += valetAmount;
-      if (v != null && v.maxCarAmount > 0 && total > v.maxCarAmount) {
-        total = v.maxCarAmount;
-      }
-    }
-    return total;
+    // totalamout / amount already contains the complete final collected amount (base parking + valet charge + fees).
+    // Do not add valetAmount again to prevent double counting.
+    return baseAmount;
   }
 
-  _SummaryTotals _computeTotals(List<Bookingdata> list) {
-    DateTime start = _selectedStartDate ?? _defaultStartDate;
-    DateTime end = _selectedEndDate ?? _defaultEndDate;
+  _SummaryTotals _computeTotals(
+    List<Bookingdata> list, {
+    DateTime? customStart,
+    DateTime? customEnd,
+    bool? customInclusiveStart,
+  }) {
+    DateTime start;
+    DateTime end;
+    bool inclusive;
 
-    if (_isFirstReport) {
-      start = DateTime(start.year, start.month, start.day, 0, 0, 0);
-      end = DateTime(end.year, end.month, end.day, 23, 59, 59, 999);
+    if (customStart != null && customEnd != null) {
+      start = customStart;
+      end = customEnd;
+      inclusive = customInclusiveStart ?? true;
     } else {
-      final now = DateTime.now();
-      if (end.isBefore(now)) {
-        end = now.add(const Duration(minutes: 5));
+      start = _selectedStartDate ?? _defaultStartDate;
+      end = _selectedEndDate ?? _defaultEndDate;
+
+      if (_isFirstReport) {
+        start = DateTime(start.year, start.month, start.day, 0, 0, 0);
+        end = DateTime(end.year, end.month, end.day, 23, 59, 59, 999);
+      } else {
+        final now = DateTime.now();
+        if (end.isBefore(now)) {
+          end = now.add(const Duration(minutes: 5));
+        }
       }
+      inclusive = _isFirstReport;
     }
 
     final totals = _SummaryTotals();
@@ -678,7 +726,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
       bool isBookedInRange = false;
       if (bookingDateTime != null) {
         isBookedInRange =
-            _isDateTimeAfterStart(bookingDateTime, start, _isFirstReport) &&
+            _isDateTimeAfterStart(bookingDateTime, start, inclusive) &&
             (bookingDateTime.isAtSameMomentAs(end) ||
                 bookingDateTime.isBefore(end));
       }
@@ -688,7 +736,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
       bool isExitedInRange = false;
       if (isExitedStatus && exitDateTime != null) {
         isExitedInRange =
-            _isDateTimeAfterStart(exitDateTime, start, _isFirstReport) &&
+            _isDateTimeAfterStart(exitDateTime, start, inclusive) &&
             (exitDateTime.isAtSameMomentAs(end) || exitDateTime.isBefore(end));
       }
 
@@ -971,6 +1019,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        titleSpacing: 0,
         title: Text(
           'Summary Report',
           style: GoogleFonts.poppins(
@@ -983,18 +1032,32 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
-          IconButton(
-            icon: Icon(Icons.article, color: ColorUtils.primarycolor()),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (context) =>
-                          CustomReportScreen(vendorid: widget.vendorid),
+          Padding(
+            padding: const EdgeInsets.only(right: 6.0),
+            child: TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) =>
+                            CustomReportScreen(vendorid: widget.vendorid),
+                  ),
+                );
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: ColorUtils.primarycolor(),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              ),
+              child: Text(
+                'Custom Report',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: ColorUtils.primarycolor(),
                 ),
-              );
-            },
+              ),
+            ),
           ),
           if (_isFirstReport)
             IconButton(
@@ -1019,17 +1082,25 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
             borderRadius: BorderRadius.circular(10),
             tabEdge: TabEdge.top,
             curve: Curves.easeIn,
-            colors: const <Color>[Colors.white, Colors.white],
+            colors: const <Color>[
+              Colors.white,
+              Colors.white,
+              Colors.white,
+            ],
             selectedTextStyle: GoogleFonts.poppins(
-              fontSize: 14.0,
+              fontSize: 12.0,
               color: ColorUtils.primarycolor(),
               fontWeight: FontWeight.bold,
             ),
             unselectedTextStyle: GoogleFonts.poppins(
-              fontSize: 13.0,
+              fontSize: 11.5,
               color: Colors.white,
             ),
-            tabs: const [Text('New Report'), Text('Past Reports')],
+            tabs: const [
+              Text('New Report'),
+              Text('Past Reports'),
+              Text("Today's Reports"),
+            ],
             children: [
               // Tab 1: New Report
               _isLoading
@@ -1102,134 +1173,9 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
                             ),
                           ),
                         Expanded(
-                          child: Card(
-                            elevation: 0,
-                            color: Colors.grey[50],
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              side: BorderSide(color: Colors.grey[200]!),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _SummaryRow(
-                                      label: 'Hourly',
-                                      count: totals.hourlyCount,
-                                      amount: totals.hourlyAmount,
-                                    ),
-                                    _SummaryRow(
-                                      label: '12 Hours Pass',
-                                      count: totals.pass12Count,
-                                      amount: totals.pass12Amount,
-                                    ),
-                                    _SummaryRow(
-                                      label: '24 Hours Pass',
-                                      count: totals.pass24Count,
-                                      amount: totals.pass24Amount,
-                                    ),
-                                    _SummaryRow(
-                                      label: '48 Hours Pass',
-                                      count: totals.pass48Count,
-                                      amount: totals.pass48Amount,
-                                    ),
-                                    _SummaryRow(
-                                      label: '72 Hours Pass',
-                                      count: totals.pass72Count,
-                                      amount: totals.pass72Amount,
-                                    ),
-                                    _SummaryRow(
-                                      label: 'Weekly Pass (7 Days)',
-                                      count: totals.weeklyCount,
-                                      amount: totals.weeklyAmount,
-                                    ),
-                                    _SummaryRow(
-                                      label: '15 Days Pass',
-                                      count: totals.pass15Count,
-                                      amount: totals.pass15Amount,
-                                    ),
-                                    _SummaryRow(
-                                      label: 'Monthly Pass (30 Days)',
-                                      count: totals.monthlyCount,
-                                      amount: totals.monthlyAmount,
-                                    ),
-                                    const Divider(),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Cash Total:',
-                                          style: GoogleFonts.poppins(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        Text(
-                                          '₹${totals.cashTotal.toStringAsFixed(2)}',
-                                          style: GoogleFonts.poppins(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.green,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Online Total:',
-                                          style: GoogleFonts.poppins(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        Text(
-                                          '₹${totals.onlineTotal.toStringAsFixed(2)}',
-                                          style: GoogleFonts.poppins(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.blue,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const Divider(),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Total Amount:',
-                                          style: GoogleFonts.poppins(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                        Text(
-                                          '₹${(totals.cashTotal + totals.onlineTotal).toStringAsFixed(2)}',
-                                          style: GoogleFonts.poppins(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Center(
-                                      child: Text(
-                                        'Bookings in range: ${filtered.length}',
-                                        style: GoogleFonts.poppins(
-                                          color: Colors.grey[600],
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                          child: _buildSummaryCardContent(
+                            totals: totals,
+                            bookingCount: filtered.length,
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -1260,8 +1206,235 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
 
               // Tab 2: Past Reports
               _buildReportHistoryList(),
+
+              // Tab 3: Today's Reports
+              _buildTodayReportTab(),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCardContent({
+    required _SummaryTotals totals,
+    required int bookingCount,
+  }) {
+    return Card(
+      elevation: 0,
+      color: Colors.grey[50],
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: Colors.grey[200]!),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SummaryRow(
+                label: 'Hourly',
+                count: totals.hourlyCount,
+                amount: totals.hourlyAmount,
+              ),
+              _SummaryRow(
+                label: '12 Hours Pass',
+                count: totals.pass12Count,
+                amount: totals.pass12Amount,
+              ),
+              _SummaryRow(
+                label: '24 Hours Pass',
+                count: totals.pass24Count,
+                amount: totals.pass24Amount,
+              ),
+              _SummaryRow(
+                label: '48 Hours Pass',
+                count: totals.pass48Count,
+                amount: totals.pass48Amount,
+              ),
+              _SummaryRow(
+                label: '72 Hours Pass',
+                count: totals.pass72Count,
+                amount: totals.pass72Amount,
+              ),
+              _SummaryRow(
+                label: 'Weekly Pass (7 Days)',
+                count: totals.weeklyCount,
+                amount: totals.weeklyAmount,
+              ),
+              _SummaryRow(
+                label: '15 Days Pass',
+                count: totals.pass15Count,
+                amount: totals.pass15Amount,
+              ),
+              _SummaryRow(
+                label: 'Monthly Pass (30 Days)',
+                count: totals.monthlyCount,
+                amount: totals.monthlyAmount,
+              ),
+              const Divider(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Cash Total:',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    '₹${totals.cashTotal.toStringAsFixed(2)}',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Online Total:',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    '₹${totals.onlineTotal.toStringAsFixed(2)}',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Total Amount:',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    '₹${(totals.cashTotal + totals.onlineTotal).toStringAsFixed(2)}',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Center(
+                child: Text(
+                  'Bookings in range: $bookingCount',
+                  style: GoogleFonts.poppins(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayReportTab() {
+    if (_isLoading) {
+      return const Center(child: LoadingGif());
+    }
+
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+    final todayFiltered = _filteredTodayBookings();
+    final todayTotals = _computeTotals(
+      todayFiltered,
+      customStart: todayStart,
+      customEnd: todayEnd,
+      customInclusiveStart: true,
+    );
+
+    final todayStr = DateFormat('dd-MM-yyyy').format(now);
+    final currentTimeStr = DateFormat('hh:mm a').format(now);
+
+    return RefreshIndicator(
+      onRefresh: _fetchBookings,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 4,
+          vertical: 12,
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '$todayStr 12:00 AM',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'to',
+                  style: GoogleFonts.poppins(fontSize: 12),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '$todayStr $currentTimeStr',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                InkWell(
+                  onTap: _isLoading ? null : () => _fetchBookings(),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: Icon(
+                      Icons.refresh,
+                      size: 16,
+                      color: ColorUtils.primarycolor(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  _error!,
+                  style: GoogleFonts.poppins(
+                    color: Colors.red,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            Expanded(
+              child: _buildSummaryCardContent(
+                totals: todayTotals,
+                bookingCount: todayFiltered.length,
+              ),
+            ),
+          ],
         ),
       ),
     );
