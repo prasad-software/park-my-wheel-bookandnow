@@ -3883,7 +3883,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         for (final line in UniversalPrintHelper.formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
           await SunmiPrinter.printText(
             line,
-            style: const SunmiTextStyle(bold: true),
+            style: SunmiTextStyle(bold: true),
           );
           await SunmiPrinter.lineWrap(1);
         }
@@ -3904,7 +3904,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         for (final line in UniversalPrintHelper.formatBoxedLines('$label : Rs. $cleanedAmt')) {
           await SunmiPrinter.printText(
             line,
-            style: const SunmiTextStyle(bold: true),
+            style: SunmiTextStyle(bold: true),
           );
           await SunmiPrinter.lineWrap(1);
         }
@@ -3915,7 +3915,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         for (final line in UniversalPrintHelper.formatBoxedLines('Full Day : Rs. $cleanedAmt')) {
           await SunmiPrinter.printText(
             line,
-            style: const SunmiTextStyle(bold: true),
+            style: SunmiTextStyle(bold: true),
           );
           await SunmiPrinter.lineWrap(1);
         }
@@ -3927,7 +3927,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           for (final line in UniversalPrintHelper.formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
             await SunmiPrinter.printText(
               line,
-              style: const SunmiTextStyle(bold: true),
+              style: SunmiTextStyle(bold: true),
             );
             await SunmiPrinter.lineWrap(1);
           }
