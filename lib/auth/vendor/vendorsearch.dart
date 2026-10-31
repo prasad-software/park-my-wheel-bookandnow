@@ -704,6 +704,80 @@ class _vSearchScreenState extends State<vSearchScreen>
 
       if (!mounted) return;
       try {
+        final String resolvedParkingDate = (vehicle['parkedDate'] ??
+                vehicle['parkingDate'] ??
+                vehicle['parkeddate'] ??
+                vehicle['parkingdate'] ??
+                vehicle['bookingDate'] ??
+                vehicle['bookingdate'] ??
+                '')
+            .toString()
+            .trim();
+        final String resolvedParkingTime = (vehicle['parkedTime'] ??
+                vehicle['parkingTime'] ??
+                vehicle['parkedtime'] ??
+                vehicle['parkingtime'] ??
+                vehicle['bookingTime'] ??
+                vehicle['bookingtime'] ??
+                '')
+            .toString()
+            .trim();
+
+        String durationForReceipt = '';
+        DateTime? parkedDT = UniversalPrintHelper.tryParseDateTime(
+          date: resolvedParkingDate,
+          time: resolvedParkingTime,
+        );
+        if (parkedDT == null &&
+            resolvedParkingDate.isNotEmpty &&
+            resolvedParkingTime.isNotEmpty) {
+          try {
+            parkedDT = _parseDateTime(resolvedParkingDate, resolvedParkingTime);
+          } catch (_) {}
+        }
+
+        if (parkedDT != null) {
+          final dur = DateTime.now().difference(parkedDT);
+          if (!dur.isNegative) {
+            final h = dur.inHours.toString().padLeft(2, '0');
+            final m = (dur.inMinutes % 60).toString().padLeft(2, '0');
+            durationForReceipt = '$h Hours $m Minutes';
+          }
+        }
+
+        if ((durationForReceipt.isEmpty ||
+                durationForReceipt == '00 Hours 00 Minutes') &&
+            vehicle['payableDuration'] is Duration) {
+          final dur = vehicle['payableDuration'] as Duration;
+          if (!dur.isNegative) {
+            final h = dur.inHours.toString().padLeft(2, '0');
+            final m = (dur.inMinutes % 60).toString().padLeft(2, '0');
+            durationForReceipt = '$h Hours $m Minutes';
+          }
+        }
+
+        if ((durationForReceipt.isEmpty ||
+                durationForReceipt == '00 Hours 00 Minutes') &&
+            dashVehicle != null) {
+          final dt = UniversalPrintHelper.tryParseDateTime(
+            date: dashVehicle.parkingDate,
+            time: dashVehicle.parkingTime,
+          );
+          if (dt != null) {
+            final dur = DateTime.now().difference(dt);
+            if (!dur.isNegative) {
+              final h = dur.inHours.toString().padLeft(2, '0');
+              final m = (dur.inMinutes % 60).toString().padLeft(2, '0');
+              durationForReceipt = '$h Hours $m Minutes';
+            }
+          }
+        }
+
+        if (durationForReceipt.isEmpty ||
+            durationForReceipt == '00 Hours 00 Minutes') {
+          durationForReceipt = '00 Hours 01 Minute';
+        }
+
         await UniversalPrintHelper.printTicket(
           context: context,
           vendorName:
@@ -712,8 +786,12 @@ class _vSearchScreenState extends State<vSearchScreen>
           invoiceId: vehicle['invoiceid']?.toString(),
           vehicleType: vehicle['vehicleType'] ?? '',
           vehicleNumber: vehicle['vehicleNumber'] ?? '',
-          parkingDate: vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? '',
-          parkingTime: vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? '',
+          parkingDate: resolvedParkingDate.isNotEmpty
+              ? resolvedParkingDate
+              : (vehicle['parkedDate'] ?? vehicle['parkingDate'] ?? ''),
+          parkingTime: resolvedParkingTime.isNotEmpty
+              ? resolvedParkingTime
+              : (vehicle['parkedTime'] ?? vehicle['parkingTime'] ?? ''),
           amount: currentAmount,
           personName: vehicle['personName'] ?? '',
           valetCharge: null, // currentAmount already includes baseAmt + valetAmt
@@ -721,6 +799,7 @@ class _vSearchScreenState extends State<vSearchScreen>
           vendorId: vehicle['vendorId'] ?? widget.vendorid,
           bookType: vehicle['bookType'] ?? '',
           sts: vehicle['sts'] ?? '',
+          preCalculatedDuration: durationForReceipt,
           fastPrint: true,
           instantParkingReceipt: true,
           isPrintAndExit: true,

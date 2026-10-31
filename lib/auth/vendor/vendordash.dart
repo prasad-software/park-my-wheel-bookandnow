@@ -4834,6 +4834,12 @@ class UniversalPrintHelper {
         }
       }
     }
+    if (isPrintAndExit &&
+        (durationText.isEmpty ||
+            durationText == '0 hr 00 min' ||
+            durationText == '00 Hours 00 Minutes')) {
+      durationText = '00 Hours 01 Minute';
+    }
 
     // Increased top spacing to prevent clipping first letter
     await SunmiPrinter.lineWrap(1);
@@ -4878,6 +4884,7 @@ class UniversalPrintHelper {
     // Always print duration (COMPLETED receipts may also have slab lines, but user expects duration).
     if (durationText.trim().isNotEmpty) {
       await SunmiPrinter.printText("Duration : $durationText");
+      await SunmiPrinter.lineWrap(1);
     }
     final stsNorm = sts?.trim().toLowerCase() ?? '';
     final passMatch = RegExp(
@@ -5057,14 +5064,18 @@ class UniversalPrintHelper {
       }
     }
 
-    // If duration is effectively zero, don't print it on receipts.
+    // If duration is effectively zero, don't print it on entry receipts.
     final normalizedDuration = durationText.trim().toLowerCase();
     final bool isZeroDuration =
         normalizedDuration == '0 hr 00 min' ||
         normalizedDuration == '00 hours 00 minutes' ||
         normalizedDuration == '0 hours 0 minutes';
     if (isZeroDuration) {
-      durationText = '';
+      if (isPrintAndExit) {
+        durationText = '00 Hours 01 Minute';
+      } else {
+        durationText = '';
+      }
     }
 
     List<String> slabLines = slabLinesOverride ?? const [];
@@ -9283,6 +9294,31 @@ class DashQuickExitHelper {
           ? finalTotal.round().toString()
           : finalTotal.toStringAsFixed(2);
 
+      String durationForReceipt = '';
+      final dt = UniversalPrintHelper.tryParseDateTime(
+        date: vehicle.parkingDate,
+        time: vehicle.parkingTime,
+      );
+      if (dt != null) {
+        final dur = DateTime.now().difference(dt);
+        if (!dur.isNegative) {
+          final h = dur.inHours.toString().padLeft(2, '0');
+          final m = (dur.inMinutes % 60).toString().padLeft(2, '0');
+          durationForReceipt = '$h Hours $m Minutes';
+        }
+      }
+      if ((durationForReceipt.isEmpty ||
+              durationForReceipt == '00 Hours 00 Minutes') &&
+          vehicle.payableDuration != Duration.zero) {
+        final h = vehicle.payableDuration.inHours.toString().padLeft(2, '0');
+        final m = (vehicle.payableDuration.inMinutes % 60).toString().padLeft(2, '0');
+        durationForReceipt = '$h Hours $m Minutes';
+      }
+      if (durationForReceipt.isEmpty ||
+          durationForReceipt == '00 Hours 00 Minutes') {
+        durationForReceipt = '00 Hours 01 Minute';
+      }
+
       if (!context.mounted) return;
       try {
         await UniversalPrintHelper.printTicket(
@@ -9301,6 +9337,7 @@ class DashQuickExitHelper {
           vendorId: vendorId,
           bookType: bookType,
           sts: vehicle.sts,
+          preCalculatedDuration: durationForReceipt,
           fastPrint: true,
           instantParkingReceipt: true,
           isPrintAndExit: true,
