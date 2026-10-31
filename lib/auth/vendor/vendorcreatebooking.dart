@@ -2711,15 +2711,22 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
               border: Border.all(color: Colors.black, width: 0.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.25),
-                  blurRadius: 20,
-                  spreadRadius: 1,
-                  offset: const Offset(0, 8),
+                  color: Colors.black.withOpacity(0.40),
+                  blurRadius: 28,
+                  spreadRadius: 3,
+                  offset: const Offset(0, 10),
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.10),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
+                  color: Colors.black.withOpacity(0.30),
+                  blurRadius: 18,
+                  spreadRadius: 2,
+                  offset: Offset.zero,
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.20),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                  offset: const Offset(0, -2),
                 ),
               ],
             ),
@@ -2791,6 +2798,14 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.grey.shade300),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Column(
                       children: [
@@ -2923,6 +2938,14 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                                 color: Colors.green.shade300,
                                 width: 1.5,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.green.withOpacity(0.12),
+                                  blurRadius: 8,
+                                  spreadRadius: 1,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
