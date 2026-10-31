@@ -3880,8 +3880,10 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
                 : '$passHoursForReceipt Hour';
         await SunmiPrinter.printText('$label Pass');
         await SunmiPrinter.lineWrap(1);
-        await SunmiPrinter.printText('Parking Amount : Rs. $cleanedAmt');
-        await SunmiPrinter.lineWrap(1);
+        for (final line in UniversalPrintHelper.formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
+          await SunmiPrinter.printText(line);
+          await SunmiPrinter.lineWrap(1);
+        }
       }
     } else if (isSubscription) {
       // Subscription: label from snapshot sts when available
@@ -3896,24 +3898,30 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
         label = 'Monthly';
       }
       if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-        await SunmiPrinter.printText('$label : Rs. $cleanedAmt');
-        await SunmiPrinter.lineWrap(1);
+        for (final line in UniversalPrintHelper.formatBoxedLines('$label : Rs. $cleanedAmt')) {
+          await SunmiPrinter.printText(line);
+          await SunmiPrinter.lineWrap(1);
+        }
       }
     } else if (!isHourly) {
       // 24-hour (full day) mode
       if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
-        await SunmiPrinter.printText('Full Day : Rs. $cleanedAmt');
-        await SunmiPrinter.lineWrap(1);
+        for (final line in UniversalPrintHelper.formatBoxedLines('Full Day : Rs. $cleanedAmt')) {
+          await SunmiPrinter.printText(line);
+          await SunmiPrinter.lineWrap(1);
+        }
       }
     } else {
       // Hourly, no pass
       if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
         if (!instantParkingReceipt || isPrintAndExit) {
-          await SunmiPrinter.printText(
-            'Parking Amount : Rs. $cleanedAmt',
-            style: SunmiTextStyle(bold: isPrintAndExit),
-          );
-          await SunmiPrinter.lineWrap(1);
+          for (final line in UniversalPrintHelper.formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
+            await SunmiPrinter.printText(
+              line,
+              style: SunmiTextStyle(bold: isPrintAndExit),
+            );
+            await SunmiPrinter.lineWrap(1);
+          }
         }
       }
     }

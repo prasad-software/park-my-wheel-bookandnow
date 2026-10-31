@@ -4155,6 +4155,15 @@ class UniversalPrintHelper {
     return (invoiceId ?? '').trim();
   }
 
+  /// Formats a line of text enclosed in a rectangular ASCII box for thermal receipt printing.
+  static List<String> formatBoxedLines(String text) {
+    final clean = text.trim();
+    final int innerWidth = clean.length + 2;
+    final String border = '+${'-' * innerWidth}+';
+    final String middle = '| $clean |';
+    return [border, middle, border];
+  }
+
   static String? _extractInvoiceIdFromMap(Map<String, dynamic> map) {
     for (final key in ['invoiceid', 'invoiceId', 'invoice_id']) {
       final v = map[key];
@@ -4901,14 +4910,20 @@ class UniversalPrintHelper {
         final label = passHours == '24' ? 'Full Day' : '$passHours Hour';
         await SunmiPrinter.printText('$label Pass');
         await SunmiPrinter.lineWrap(1);
-        await SunmiPrinter.printText('Parking Amount : Rs. $cleanedAmt');
+        for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
+          await SunmiPrinter.printText(line);
+          await SunmiPrinter.lineWrap(1);
+        }
       }
     } else if (stsNorm == 'weekly' || stsNorm == 'monthly') {
       // Subscription: print weekly / monthly label with the booking amount
       final label = stsNorm == 'weekly' ? 'Weekly' : 'Monthly';
       if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
         await SunmiPrinter.lineWrap(1);
-        await SunmiPrinter.printText('$label : Rs. $cleanedAmt');
+        for (final line in formatBoxedLines('$label : Rs. $cleanedAmt')) {
+          await SunmiPrinter.printText(line);
+          await SunmiPrinter.lineWrap(1);
+        }
       }
     } else if ((bookType ?? '').trim().toLowerCase() == '24 hours' &&
         !skipChargeLookup) {
@@ -4927,13 +4942,22 @@ class UniversalPrintHelper {
               : cleanedAmt;
       if (displayAmt.isNotEmpty && displayAmt != '0') {
         await SunmiPrinter.lineWrap(1);
-        await SunmiPrinter.printText('Full Day : Rs. $displayAmt');
+        for (final line in formatBoxedLines('Full Day : Rs. $displayAmt')) {
+          await SunmiPrinter.printText(line);
+          await SunmiPrinter.lineWrap(1);
+        }
       }
     } else {
       if (cleanedAmt.isNotEmpty && cleanedAmt != '0') {
         if (!instantParkingReceipt || isPrintAndExit) {
           await SunmiPrinter.lineWrap(1);
-          await SunmiPrinter.printText('Parking Amount : Rs. $cleanedAmt');
+          for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
+            await SunmiPrinter.printText(
+              line,
+              style: SunmiTextStyle(bold: isPrintAndExit),
+            );
+            await SunmiPrinter.lineWrap(1);
+          }
         }
       }
     }
@@ -5133,15 +5157,19 @@ class UniversalPrintHelper {
         final label = passHours == '24' ? 'Full Day' : '$passHours Hour';
         bytes += '$label Pass'.codeUnits;
         bytes += [0x0A];
-        bytes += 'Amount : Rs. $cleanedEscAmt'.codeUnits;
-        bytes += [0x0A];
+        for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedEscAmt')) {
+          bytes += line.codeUnits;
+          bytes += [0x0A];
+        }
       }
     } else if (stsNormEsc == 'weekly' || stsNormEsc == 'monthly') {
       // Subscription
       final label = stsNormEsc == 'weekly' ? 'Weekly' : 'Monthly';
       if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
-        bytes += '$label : Rs. $cleanedEscAmt'.codeUnits;
-        bytes += [0x0A];
+        for (final line in formatBoxedLines('$label : Rs. $cleanedEscAmt')) {
+          bytes += line.codeUnits;
+          bytes += [0x0A];
+        }
       }
     } else if ((bookType ?? '').trim().toLowerCase() == '24 hours') {
       String? fullDayAmt;
@@ -5160,14 +5188,18 @@ class UniversalPrintHelper {
               ? fullDayAmt
               : cleanedEscAmt;
       if (displayAmt.isNotEmpty && displayAmt != '0') {
-        bytes += 'Full Day : Rs. $displayAmt'.codeUnits;
-        bytes += [0x0A];
+        for (final line in formatBoxedLines('Full Day : Rs. $displayAmt')) {
+          bytes += line.codeUnits;
+          bytes += [0x0A];
+        }
       }
     } else {
       if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
         if (!instantParkingReceipt || isPrintAndExit) {
-          bytes += 'Parking Amount : Rs. $cleanedEscAmt'.codeUnits;
-          bytes += [0x0A];
+          for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedEscAmt')) {
+            bytes += line.codeUnits;
+            bytes += [0x0A];
+          }
         }
       }
     }
