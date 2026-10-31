@@ -3944,7 +3944,9 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
       await SunmiPrinter.printText('\u00A0\n\u00A0'); // Extra space after QR
     }
 
-    if (operationalTimings != null && operationalTimings.isNotEmpty) {
+    if (!isPrintAndExit &&
+        operationalTimings != null &&
+        operationalTimings.isNotEmpty) {
       await SunmiPrinter.lineWrap(1);
       await SunmiPrinter.printText('Timings : $operationalTimings');
     }

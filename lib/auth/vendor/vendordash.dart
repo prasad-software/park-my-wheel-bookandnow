@@ -4987,7 +4987,9 @@ class UniversalPrintHelper {
       await SunmiPrinter.printText('\u00A0\n\u00A0'); // Extra space after QR
     }
 
-    if (operationalTimings != null && operationalTimings.isNotEmpty) {
+    if (!isPrintAndExit &&
+        operationalTimings != null &&
+        operationalTimings.isNotEmpty) {
       await SunmiPrinter.lineWrap(1);
       await SunmiPrinter.printText('Timings : $operationalTimings');
     }
@@ -5286,7 +5288,9 @@ class UniversalPrintHelper {
       bytes += [0x0A]; // Line feed
     }
 
-    if (operationalTimings != null && operationalTimings.isNotEmpty) {
+    if (!isPrintAndExit &&
+        operationalTimings != null &&
+        operationalTimings.isNotEmpty) {
       bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
       bytes += 'Timings : $operationalTimings'.codeUnits;
       bytes += [0x0A]; // Line feed
