@@ -3932,11 +3932,13 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
       await SunmiPrinter.printText('Timings : $operationalTimings');
     }
 
-    await SunmiPrinter.printText(
-      'we are not responsible for any belongings inside and outside of the vehicle.',
-      style: SunmiTextStyle(align: SunmiPrintAlign.CENTER),
-    );
-    await SunmiPrinter.lineWrap(1);
+    if (!isPrintAndExit) {
+      await SunmiPrinter.printText(
+        'we are not responsible for any belongings inside and outside of the vehicle.',
+        style: SunmiTextStyle(align: SunmiPrintAlign.CENTER),
+      );
+      await SunmiPrinter.lineWrap(1);
+    }
     await SunmiPrinter.printText(
       '**************************',
       style: SunmiTextStyle(align: SunmiPrintAlign.CENTER),

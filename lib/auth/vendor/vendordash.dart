@@ -4952,11 +4952,13 @@ class UniversalPrintHelper {
       await SunmiPrinter.printText('Timings : $operationalTimings');
     }
 
-    await SunmiPrinter.lineWrap(1);
-    await SunmiPrinter.printText(
-      'we are not responsible for any belongings inside and outside of the vehicle.',
-      style: SunmiTextStyle(align: SunmiPrintAlign.CENTER),
-    );
+    if (!isPrintAndExit) {
+      await SunmiPrinter.lineWrap(1);
+      await SunmiPrinter.printText(
+        'we are not responsible for any belongings inside and outside of the vehicle.',
+        style: SunmiTextStyle(align: SunmiPrintAlign.CENTER),
+      );
+    }
     await SunmiPrinter.lineWrap(1);
     await SunmiPrinter.printText(
       '**************************',
@@ -5230,12 +5232,14 @@ class UniversalPrintHelper {
       bytes += [0x0A]; // Line feed
     }
 
-    // Separator above footer â€” center
-    bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
-    bytes +=
-        'we are not responsible for any belongings inside and outside of the vehicle.'
-            .codeUnits;
-    bytes += [0x0A]; // Line feed
+    if (!isPrintAndExit) {
+      // Separator above footer — center
+      bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
+      bytes +=
+          'we are not responsible for any belongings inside and outside of the vehicle.'
+              .codeUnits;
+      bytes += [0x0A]; // Line feed
+    }
     bytes += '**************************'.codeUnits;
     bytes += [0x0A]; // Line feed (footer on next line)
     // Footer - Powered by (Centered)
@@ -8649,6 +8653,7 @@ class vendordashright extends StatelessWidget {
                                             sts: vehicle.sts,
                                             preCalculatedDuration:
                                                 preCalculatedDuration,
+                                            isPrintAndExit: isCompleted,
                                           );
                                         },
                                         style: ElevatedButton.styleFrom(
