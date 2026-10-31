@@ -537,27 +537,7 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
   }
 
   bool _isDateTimeAfterStart(DateTime dt, DateTime start, bool isFirstReport) {
-    if (isFirstReport) {
-      return dt.isAtSameMomentAs(start) || dt.isAfter(start);
-    }
-    // For subsequent reports, start represents the cutoff of the previous report.
-    // If dt is at or before start, it was already included in the previous report.
-    if (dt.isBefore(start) || dt.isAtSameMomentAs(start)) {
-      return false;
-    }
-    // If start is at minute precision (seconds == 0 and ms == 0),
-    // any booking occurring in that same minute (e.g. 15:52:15 when cutoff is 15:52:00)
-    // was already covered in that previous report.
-    if (start.second == 0 && start.millisecond == 0) {
-      if (dt.year == start.year &&
-          dt.month == start.month &&
-          dt.day == start.day &&
-          dt.hour == start.hour &&
-          dt.minute == start.minute) {
-        return false;
-      }
-    }
-    return dt.isAfter(start);
+    return dt.isAtSameMomentAs(start) || dt.isAfter(start);
   }
 
   List<Bookingdata> _filterBookingsInRange({
@@ -919,7 +899,11 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
 
     final entryCount =
         _bookings.where((b) {
-          if (b.Vendorid != widget.vendorid) return false;
+          if (b.Vendorid.isNotEmpty &&
+              widget.vendorid.isNotEmpty &&
+              b.Vendorid.trim().toLowerCase() != widget.vendorid.trim().toLowerCase()) {
+            return false;
+          }
           final dt = _combineDateTime(b.bookingDate, b.bookingTime);
           if (dt == null) return false;
           return _isDateTimeAfterStart(dt, printedStartDate, _isFirstReport) &&
@@ -928,7 +912,11 @@ class _SummaryReportScreenState extends State<SummaryReportScreen>
 
     final exitCount =
         _bookings.where((b) {
-          if (b.Vendorid != widget.vendorid) return false;
+          if (b.Vendorid.isNotEmpty &&
+              widget.vendorid.isNotEmpty &&
+              b.Vendorid.trim().toLowerCase() != widget.vendorid.trim().toLowerCase()) {
+            return false;
+          }
           if (!_isBookingExited(b)) return false;
           final dt = _combineDateTime(b.exitvehicledate, b.exitvehicletime);
           if (dt == null) return false;

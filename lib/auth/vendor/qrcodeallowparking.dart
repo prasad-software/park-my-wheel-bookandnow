@@ -2816,10 +2816,16 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       }
 
       if (response.statusCode == 200) {
+        GlobalRecentExits.exitedBookingIds.add(bookingId);
+        await LocalDbService.markBookingCompletedOffline(
+          bookingId,
+          amount: double.tryParse(requestBody['totalamout']?.toString() ?? requestBody['amount']?.toString() ?? '0') ?? parkingCharge,
+          paymentMode: selectedPaymentMode,
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Vehicle exited successfully (Cash)!'),
+            SnackBar(
+              content: Text('Vehicle exited successfully ($selectedPaymentMode)!'),
             ),
           );
           _fetchBookingDetails(); // Refresh details

@@ -241,7 +241,11 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
 
   List<Bookingdata> _filteredBookings() {
     return _bookings.where((b) {
-      if (b.Vendorid != widget.vendorid) return false;
+      if (b.Vendorid.isNotEmpty &&
+          widget.vendorid.isNotEmpty &&
+          b.Vendorid.trim().toLowerCase() != widget.vendorid.trim().toLowerCase()) {
+        return false;
+      }
 
       final bookingDateTime = _combineDateTime(
         b.bookingDate.isNotEmpty ? b.bookingDate : (b.parkeddate.isNotEmpty ? b.parkeddate : b.parkingDate),
@@ -518,7 +522,11 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
 
     final entryCount =
         _bookings.where((b) {
-          if (b.Vendorid != widget.vendorid) return false;
+          if (b.Vendorid.isNotEmpty &&
+          widget.vendorid.isNotEmpty &&
+          b.Vendorid.trim().toLowerCase() != widget.vendorid.trim().toLowerCase()) {
+        return false;
+      }
           final dt = _combineDateTime(b.bookingDate, b.bookingTime);
           if (dt == null) return false;
           return (dt.isAtSameMomentAs(_selectedStartDateTime) ||
@@ -529,7 +537,11 @@ class _CustomReportScreenState extends State<CustomReportScreen> {
 
     final exitCount =
         _bookings.where((b) {
-          if (b.Vendorid != widget.vendorid) return false;
+          if (b.Vendorid.isNotEmpty &&
+          widget.vendorid.isNotEmpty &&
+          b.Vendorid.trim().toLowerCase() != widget.vendorid.trim().toLowerCase()) {
+        return false;
+      }
           if (!_isBookingExited(b)) return false;
           final dt = _combineDateTime(b.exitvehicledate, b.exitvehicletime);
           if (dt == null) return false;

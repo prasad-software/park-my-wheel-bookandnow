@@ -4139,7 +4139,16 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
 
     // Clean amount (remove anything that's not a digit or period)
     amountStr = amountStr.replaceAll(RegExp(r'[^0-9.]'), '');
-    int amountInPaise = (double.parse(amountStr) * 100).toInt();
+    final double baseAmt = double.tryParse(amountStr) ?? 0.0;
+    double appliedValetAmount = 0.0;
+    if (_valetEnabled && _isValetSelected && _isValetChargeApplicable()) {
+      double valetAmount = _getValetChargeAmount();
+      if (valetAmount > 0) {
+        appliedValetAmount = valetAmount;
+      }
+    }
+    final double totalCharge = baseAmt + appliedValetAmount;
+    int amountInPaise = (totalCharge * 100).toInt();
 
     setState(() {
       _isLoading = true;
@@ -4359,8 +4368,17 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
       }
     }
 
-    // Valet charge is handled at exit, so we do not add it to the base amount here.
-    // Base amount should remain the pure parking rate.
+    // In Print & Exit, the vehicle exits immediately upon registration.
+    // The final exit total must include the base parking charge plus any valet charge.
+    final double baseAmt =
+        double.tryParse(amount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+    final double finalExitTotal = baseAmt + appliedValetAmount;
+    final String finalExitTotalStr = finalExitTotal > 0
+        ? (finalExitTotal == finalExitTotal.roundToDouble()
+            ? finalExitTotal.round().toString()
+            : finalExitTotal.toStringAsFixed(2))
+        : amount;
+
     final String stsSnapshot = _stsForBookingRequest();
     final data = {
       'carType': CartypeController.text,
@@ -4371,8 +4389,9 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
       'sts': stsSnapshot,
       'bookingDate': DateFormat("dd-MM-yyyy").format(now),
       'vendorId': widget.vendorid,
-      'amount': amount,
-      'hour': "",
+      'amount': finalExitTotalStr,
+      'totalamout': finalExitTotalStr,
+      'hour': "00:01:00",
       'status': status,
       'vehicleType': vehicleType,
       'parkingDate': parkingDate,
@@ -4437,15 +4456,7 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           final List<String> capturedPhotoPaths =
               _vehicleImages.map((f) => f.path).toList();
 
-          final double printBaseAmt =
-              double.tryParse(receiptAmount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
-          final double printTotalWithValet =
-              printBaseAmt + (appliedValetAmount > 0 ? appliedValetAmount : 0.0);
-          final String printTotalAmt = printTotalWithValet > 0
-              ? (printTotalWithValet == printTotalWithValet.roundToDouble()
-                  ? printTotalWithValet.round().toString()
-                  : printTotalWithValet.toStringAsFixed(2))
-              : receiptAmount;
+          final String printTotalAmt = finalExitTotalStr;
 
           // Clear loading spinner
           setState(() {
@@ -4516,6 +4527,14 @@ class _ChooseParkingPageState extends State<vendorChooseParkingPage> {
           );
 
           if (!mounted) return;
+          if (bookingId.isNotEmpty) {
+            GlobalRecentExits.exitedBookingIds.add(bookingId);
+            await LocalDbService.markBookingCompletedOffline(
+              bookingId,
+              amount: finalExitTotal,
+              paymentMode: _paymentMode,
+            );
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
