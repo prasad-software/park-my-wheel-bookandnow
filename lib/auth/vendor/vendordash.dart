@@ -4920,7 +4920,7 @@ class UniversalPrintHelper {
         for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
           await SunmiPrinter.printText(
             line,
-            style: SunmiTextStyle(align: SunmiPrintAlign.CENTER, bold: true),
+            style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
           );
           await SunmiPrinter.lineWrap(1);
         }
@@ -4933,7 +4933,7 @@ class UniversalPrintHelper {
         for (final line in formatBoxedLines('$label : Rs. $cleanedAmt')) {
           await SunmiPrinter.printText(
             line,
-            style: SunmiTextStyle(align: SunmiPrintAlign.CENTER, bold: true),
+            style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
           );
           await SunmiPrinter.lineWrap(1);
         }
@@ -4958,7 +4958,7 @@ class UniversalPrintHelper {
         for (final line in formatBoxedLines('Full Day : Rs. $displayAmt')) {
           await SunmiPrinter.printText(
             line,
-            style: SunmiTextStyle(align: SunmiPrintAlign.CENTER, bold: true),
+            style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
           );
           await SunmiPrinter.lineWrap(1);
         }
@@ -4970,7 +4970,7 @@ class UniversalPrintHelper {
           for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedAmt')) {
             await SunmiPrinter.printText(
               line,
-              style: SunmiTextStyle(align: SunmiPrintAlign.CENTER, bold: true),
+              style: SunmiTextStyle(fontSize: 26, align: SunmiPrintAlign.CENTER, bold: true),
             );
             await SunmiPrinter.lineWrap(1);
           }
@@ -5181,12 +5181,18 @@ class UniversalPrintHelper {
         bytes += '$label Pass'.codeUnits;
         bytes += [0x0A];
         bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
-        bytes += [0x1B, 0x45, 0x01, 0x1B, 0x47, 0x01]; // ESC E 1 + ESC G 1 (Bold ON)
+        bytes += [0x1D, 0x21, 0x01]; // GS ! 1 (Double height - larger font size)
+        bytes += [0x1B, 0x21, 0x18]; // ESC ! 0x18 (Double height + Bold/Emphasized)
+        bytes += [0x1B, 0x45, 0x01]; // ESC E 1 (Bold ON)
+        bytes += [0x1B, 0x47, 0x01]; // ESC G 1 (Double strike ON)
         for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedEscAmt')) {
           bytes += line.codeUnits;
           bytes += [0x0A];
         }
-        bytes += [0x1B, 0x45, 0x00, 0x1B, 0x47, 0x00]; // Bold OFF
+        bytes += [0x1D, 0x21, 0x00]; // GS ! 0 (Normal size)
+        bytes += [0x1B, 0x21, 0x00]; // ESC ! 0 (Normal size & no bold)
+        bytes += [0x1B, 0x45, 0x00]; // ESC E 0 (Bold OFF)
+        bytes += [0x1B, 0x47, 0x00]; // ESC G 0 (Double strike OFF)
         bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
       }
     } else if (stsNormEsc == 'weekly' || stsNormEsc == 'monthly') {
@@ -5194,12 +5200,18 @@ class UniversalPrintHelper {
       final label = stsNormEsc == 'weekly' ? 'Weekly' : 'Monthly';
       if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
         bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
-        bytes += [0x1B, 0x45, 0x01, 0x1B, 0x47, 0x01]; // ESC E 1 + ESC G 1 (Bold ON)
+        bytes += [0x1D, 0x21, 0x01]; // GS ! 1 (Double height - larger font size)
+        bytes += [0x1B, 0x21, 0x18]; // ESC ! 0x18 (Double height + Bold/Emphasized)
+        bytes += [0x1B, 0x45, 0x01]; // ESC E 1 (Bold ON)
+        bytes += [0x1B, 0x47, 0x01]; // ESC G 1 (Double strike ON)
         for (final line in formatBoxedLines('$label : Rs. $cleanedEscAmt')) {
           bytes += line.codeUnits;
           bytes += [0x0A];
         }
-        bytes += [0x1B, 0x45, 0x00, 0x1B, 0x47, 0x00]; // Bold OFF
+        bytes += [0x1D, 0x21, 0x00]; // GS ! 0 (Normal size)
+        bytes += [0x1B, 0x21, 0x00]; // ESC ! 0 (Normal size & no bold)
+        bytes += [0x1B, 0x45, 0x00]; // ESC E 0 (Bold OFF)
+        bytes += [0x1B, 0x47, 0x00]; // ESC G 0 (Double strike OFF)
         bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
       }
     } else if ((bookType ?? '').trim().toLowerCase() == '24 hours') {
@@ -5220,24 +5232,36 @@ class UniversalPrintHelper {
               : cleanedEscAmt;
       if (displayAmt.isNotEmpty && displayAmt != '0') {
         bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
-        bytes += [0x1B, 0x45, 0x01, 0x1B, 0x47, 0x01]; // ESC E 1 + ESC G 1 (Bold ON)
+        bytes += [0x1D, 0x21, 0x01]; // GS ! 1 (Double height - larger font size)
+        bytes += [0x1B, 0x21, 0x18]; // ESC ! 0x18 (Double height + Bold/Emphasized)
+        bytes += [0x1B, 0x45, 0x01]; // ESC E 1 (Bold ON)
+        bytes += [0x1B, 0x47, 0x01]; // ESC G 1 (Double strike ON)
         for (final line in formatBoxedLines('Full Day : Rs. $displayAmt')) {
           bytes += line.codeUnits;
           bytes += [0x0A];
         }
-        bytes += [0x1B, 0x45, 0x00, 0x1B, 0x47, 0x00]; // Bold OFF
+        bytes += [0x1D, 0x21, 0x00]; // GS ! 0 (Normal size)
+        bytes += [0x1B, 0x21, 0x00]; // ESC ! 0 (Normal size & no bold)
+        bytes += [0x1B, 0x45, 0x00]; // ESC E 0 (Bold OFF)
+        bytes += [0x1B, 0x47, 0x00]; // ESC G 0 (Double strike OFF)
         bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
       }
     } else {
       if (cleanedEscAmt.isNotEmpty && cleanedEscAmt != '0') {
         if (!instantParkingReceipt || isPrintAndExit) {
           bytes += [0x1B, 0x61, 0x01]; // ESC a 1 (Centered)
-          bytes += [0x1B, 0x45, 0x01, 0x1B, 0x47, 0x01]; // ESC E 1 + ESC G 1 (Bold ON)
+          bytes += [0x1D, 0x21, 0x01]; // GS ! 1 (Double height - larger font size)
+          bytes += [0x1B, 0x21, 0x18]; // ESC ! 0x18 (Double height + Bold/Emphasized)
+          bytes += [0x1B, 0x45, 0x01]; // ESC E 1 (Bold ON)
+          bytes += [0x1B, 0x47, 0x01]; // ESC G 1 (Double strike ON)
           for (final line in formatBoxedLines('Parking Amount : Rs. $cleanedEscAmt')) {
             bytes += line.codeUnits;
             bytes += [0x0A];
           }
-          bytes += [0x1B, 0x45, 0x00, 0x1B, 0x47, 0x00]; // Bold OFF
+          bytes += [0x1D, 0x21, 0x00]; // GS ! 0 (Normal size)
+          bytes += [0x1B, 0x21, 0x00]; // ESC ! 0 (Normal size & no bold)
+          bytes += [0x1B, 0x45, 0x00]; // ESC E 0 (Bold OFF)
+          bytes += [0x1B, 0x47, 0x00]; // ESC G 0 (Double strike OFF)
           bytes += [0x1B, 0x61, 0x00]; // ESC a 0 (Left align reset)
         }
       }
